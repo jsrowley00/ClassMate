@@ -141,6 +141,20 @@ export const learningObjectives = pgTable("learning_objectives", {
   generatedAt: timestamp("generated_at").defaultNow(),
 });
 
+// Learning objective mastery tracking - tracks student progress on each objective
+export const objectiveMastery = pgTable("objective_mastery", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  moduleId: varchar("module_id").notNull().references(() => courseModules.id, { onDelete: 'cascade' }),
+  objectiveIndex: integer("objective_index").notNull(), // Index in the objectives array
+  objectiveText: text("objective_text").notNull(), // Snapshot of the objective text
+  correctCount: integer("correct_count").notNull().default(0), // Times answered correctly
+  totalCount: integer("total_count").notNull().default(0), // Total times encountered
+  lastEncountered: timestamp("last_encountered").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations (must be defined after all tables)
 export const usersRelations = relations(users, ({ many }) => ({
   coursesCreated: many(courses),
@@ -260,6 +274,21 @@ export const learningObjectivesRelations = relations(learningObjectives, ({ one 
   }),
 }));
 
+export const objectiveMasteryRelations = relations(objectiveMastery, ({ one }) => ({
+  student: one(users, {
+    fields: [objectiveMastery.studentId],
+    references: [users.id],
+  }),
+  course: one(courses, {
+    fields: [objectiveMastery.courseId],
+    references: [courses.id],
+  }),
+  module: one(courseModules, {
+    fields: [objectiveMastery.moduleId],
+    references: [courseModules.id],
+  }),
+}));
+
 // Zod schemas and types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -343,3 +372,11 @@ export const insertLearningObjectiveSchema = createInsertSchema(learningObjectiv
 });
 export type InsertLearningObjective = z.infer<typeof insertLearningObjectiveSchema>;
 export type LearningObjective = typeof learningObjectives.$inferSelect;
+
+export const insertObjectiveMasterySchema = createInsertSchema(objectiveMastery).omit({
+  id: true,
+  lastEncountered: true,
+  updatedAt: true,
+});
+export type InsertObjectiveMastery = z.infer<typeof insertObjectiveMasterySchema>;
+export type ObjectiveMastery = typeof objectiveMastery.$inferSelect;

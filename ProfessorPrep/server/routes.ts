@@ -961,6 +961,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get student's learning objective mastery/progress for a course
+  app.get('/api/courses/:id/student-progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Check if student is enrolled in the course
+      const isEnrolled = await storage.isEnrolled(userId, id);
+      if (!isEnrolled) {
+        return res.status(403).json({ message: "Not enrolled in this course" });
+      }
+
+      // Get all learning objectives for this course
+      const allObjectives = await storage.getLearningObjectivesByCourse(id);
+      
+      // Get student's mastery data
+      const masteryData = await storage.getStudentObjectiveMastery(userId, id);
+      
+      // Create a map for quick lookup: moduleId-objectiveIndex -> mastery data
+      const masteryMap = new Map<string, { correctCount: number; totalCount: number; lastEncountered: Date | null }>();
+      masteryData.forEach(m => {
+        const key = `${m.moduleId}-${m.objectiveIndex}`;
+        masteryMap.set(key, {
+          correctCount: m.correctCount,
+          totalCount: m.totalCount,
+          lastEncountered: m.lastEncountered,
+        });
+      });
+
+      // Build response with all objectives and their mastery levels
+      const progress = allObjectives.map(obj => {
+        const objectivesWithMastery = obj.objectives.map((objectiveText, index) => {
+          const key = `${obj.moduleId}-${index}`;
+          const mastery = masteryMap.get(key);
+          
+          return {
+            moduleId: obj.moduleId,
+            objectiveIndex: index,
+            objectiveText,
+            correctCount: mastery?.correctCount || 0,
+            totalCount: mastery?.totalCount || 0,
+            masteryPercentage: mastery && mastery.totalCount > 0 
+              ? Math.round((mastery.correctCount / mastery.totalCount) * 100)
+              : 0,
+            lastEncountered: mastery?.lastEncountered || null,
+          };
+        });
+
+        return {
+          moduleId: obj.moduleId,
+          objectives: objectivesWithMastery,
+        };
+      });
+
+      res.json({ progress });
+    } catch (error) {
+      console.error("Error getting student progress:", error);
+      res.status(500).json({ message: "Failed to get student progress" });
+    }
+  });
+
   // Helper function to extract topics from question text
   function extractTopicFromQuestion(questionText: string): string {
     // Remove common question starters

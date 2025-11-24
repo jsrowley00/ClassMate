@@ -895,14 +895,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const questions = test.questions as any[];
       let correctCount = 0;
 
-      questions.forEach((question, idx) => {
+      // Get all learning objectives for the course to map objective indices
+      const courseObjectives = await storage.getLearningObjectivesByCourse(test.courseId);
+      
+      // Create a map: moduleId -> objectives array
+      const objectivesMap = new Map<string, { moduleId: string; objectives: string[] }>();
+      courseObjectives.forEach(obj => {
+        objectivesMap.set(obj.moduleId, { moduleId: obj.moduleId, objectives: obj.objectives });
+      });
+
+      // Track mastery for each question
+      for (let idx = 0; idx < questions.length; idx++) {
+        const question = questions[idx];
         const userAnswer = answers[idx];
+        let wasCorrect = false;
+
         if (userAnswer && question.correctAnswer) {
           if (userAnswer.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim()) {
             correctCount++;
+            wasCorrect = true;
           }
         }
-      });
+
+        // Update objective mastery if this question has objective tags
+        if (question.objectiveIndices && Array.isArray(question.objectiveIndices) && test.selectedModuleIds) {
+          // For each module that was selected for this test
+          for (const moduleId of test.selectedModuleIds) {
+            const moduleObjectives = objectivesMap.get(moduleId);
+            if (moduleObjectives) {
+              // For each objective this question assesses
+              for (const objectiveIndex of question.objectiveIndices) {
+                // Check if the index is valid for this module's objectives
+                if (objectiveIndex >= 0 && objectiveIndex < moduleObjectives.objectives.length) {
+                  const objectiveText = moduleObjectives.objectives[objectiveIndex];
+                  
+                  // Update mastery for this objective
+                  await storage.updateObjectiveMastery(
+                    userId,
+                    test.courseId,
+                    moduleId,
+                    objectiveIndex,
+                    objectiveText,
+                    wasCorrect
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
 
       const score = Math.round((correctCount / questions.length) * 100);
 

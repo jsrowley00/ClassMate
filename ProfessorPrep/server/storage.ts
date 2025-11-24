@@ -10,6 +10,7 @@ import {
   flashcardSets,
   flashcards,
   learningObjectives,
+  objectiveMastery,
   type User,
   type UpsertUser,
   type Course,
@@ -32,6 +33,8 @@ import {
   type InsertFlashcard,
   type LearningObjective,
   type InsertLearningObjective,
+  type ObjectiveMastery,
+  type InsertObjectiveMastery,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -101,6 +104,17 @@ export interface IStorage {
   createLearningObjectives(objectives: InsertLearningObjective): Promise<LearningObjective>;
   updateLearningObjectives(moduleId: string, objectives: string[]): Promise<LearningObjective>;
   deleteLearningObjectives(moduleId: string): Promise<void>;
+
+  // Objective mastery operations
+  updateObjectiveMastery(
+    studentId: string,
+    courseId: string,
+    moduleId: string,
+    objectiveIndex: number,
+    objectiveText: string,
+    wasCorrect: boolean
+  ): Promise<void>;
+  getStudentObjectiveMastery(studentId: string, courseId: string): Promise<ObjectiveMastery[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -516,6 +530,64 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLearningObjectives(moduleId: string): Promise<void> {
     await db.delete(learningObjectives).where(eq(learningObjectives.moduleId, moduleId));
+  }
+
+  // Objective mastery operations
+  async updateObjectiveMastery(
+    studentId: string,
+    courseId: string,
+    moduleId: string,
+    objectiveIndex: number,
+    objectiveText: string,
+    wasCorrect: boolean
+  ): Promise<void> {
+    // Check if a mastery record already exists for this student/objective
+    const [existing] = await db
+      .select()
+      .from(objectiveMastery)
+      .where(
+        and(
+          eq(objectiveMastery.studentId, studentId),
+          eq(objectiveMastery.moduleId, moduleId),
+          eq(objectiveMastery.objectiveIndex, objectiveIndex)
+        )
+      );
+
+    if (existing) {
+      // Update existing record
+      await db
+        .update(objectiveMastery)
+        .set({
+          correctCount: wasCorrect ? existing.correctCount + 1 : existing.correctCount,
+          totalCount: existing.totalCount + 1,
+          lastEncountered: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(objectiveMastery.id, existing.id));
+    } else {
+      // Create new record
+      await db.insert(objectiveMastery).values({
+        studentId,
+        courseId,
+        moduleId,
+        objectiveIndex,
+        objectiveText,
+        correctCount: wasCorrect ? 1 : 0,
+        totalCount: 1,
+      });
+    }
+  }
+
+  async getStudentObjectiveMastery(studentId: string, courseId: string): Promise<ObjectiveMastery[]> {
+    return await db
+      .select()
+      .from(objectiveMastery)
+      .where(
+        and(
+          eq(objectiveMastery.studentId, studentId),
+          eq(objectiveMastery.courseId, courseId)
+        )
+      );
   }
 }
 

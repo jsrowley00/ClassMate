@@ -121,6 +121,7 @@ export default function CourseOverview() {
   const { data: progressData } = useQuery<{
     progress: Array<{
       moduleId: string;
+      objectivesDefined: boolean;
       objectives: Array<{
         moduleId: string;
         objectiveIndex: number;

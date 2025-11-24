@@ -1012,7 +1012,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Build response for ALL modules using canonical objectives
       const progress = allModules.map((module) => {
-        const moduleObjectives = objectivesMap.get(module.id) || [];
+        const moduleObjectives = objectivesMap.get(module.id);
+        
+        // Check if this module has objectives defined
+        const hasObjectivesDefined = moduleObjectives !== undefined;
+        
+        if (!hasObjectivesDefined) {
+          // Module has no objectives generated yet
+          return {
+            moduleId: module.id,
+            objectivesDefined: false,
+            objectives: [],
+          };
+        }
         
         // Map each objective with its mastery data
         const objectivesWithMastery = moduleObjectives.map((objectiveText, index) => {
@@ -1035,6 +1047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         return {
           moduleId: module.id,
+          objectivesDefined: true,
           objectives: objectivesWithMastery,
         };
       });

@@ -925,11 +925,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (moduleObjectives) {
               // For each objective this question assesses
               for (const objectiveIndex of question.objectiveIndices) {
-                // Check if the index is valid for this module's objectives
+                // VALIDATE: Check if the index is valid for this module's current objectives
                 if (objectiveIndex >= 0 && objectiveIndex < moduleObjectives.objectives.length) {
                   const objectiveText = moduleObjectives.objectives[objectiveIndex];
                   
-                  // Update mastery for this objective
+                  // Update mastery for this objective with current canonical text
                   await storage.updateObjectiveMastery(
                     userId,
                     test.courseId,
@@ -938,8 +938,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     objectiveText,
                     wasCorrect
                   );
+                } else {
+                  // Log when objective index is out of bounds (stale data from test generation)
+                  console.warn(
+                    `Skipping mastery update for stale objective index: ` +
+                    `moduleId=${moduleId}, index=${objectiveIndex}, ` +
+                    `current objectives count=${moduleObjectives.objectives.length}`
+                  );
                 }
               }
+            } else {
+              console.warn(
+                `Skipping mastery update for module with no objectives: moduleId=${moduleId}`
+              );
             }
           }
         }

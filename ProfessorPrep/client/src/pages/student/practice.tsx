@@ -272,9 +272,15 @@ export default function PracticeTest() {
                             checked={selectedModules.includes(parentModule.id)}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedModules([...selectedModules, parentModule.id]);
+                                // When checking parent, also check all child modules (weeks)
+                                const childIds = childModules.map(c => c.id);
+                                setSelectedModules([...selectedModules, parentModule.id, ...childIds]);
                               } else {
-                                setSelectedModules(selectedModules.filter(id => id !== parentModule.id));
+                                // When unchecking parent, also uncheck all child modules (weeks)
+                                const childIds = childModules.map(c => c.id);
+                                setSelectedModules(selectedModules.filter(id => 
+                                  id !== parentModule.id && !childIds.includes(id)
+                                ));
                               }
                             }}
                             data-testid={`checkbox-module-${parentModule.id}`}

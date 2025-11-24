@@ -9,6 +9,7 @@ export interface Question {
   type: "multiple_choice" | "short_answer" | "fill_blank";
   options?: string[];
   correctAnswer: string;
+  objectiveIndices?: number[]; // Indices of learning objectives this question assesses (0-based)
 }
 
 // Helper function to shuffle an array
@@ -53,7 +54,7 @@ Return your response as a JSON array of questions. Each question should have:
 - question: The question text
 - type: "${testMode === "multiple_choice" ? "multiple_choice" : testMode === "short_answer" ? "short_answer" : testMode === "fill_blank" ? "fill_blank" : "multiple_choice"}"
 ${testMode === "multiple_choice" ? '- options: An array of 4 answer choices' : ''}
-- correctAnswer: The correct answer
+- correctAnswer: The correct answer${learningObjectives.length > 0 ? '\n- objectiveIndices: An array of objective numbers (starting from 1) that this question assesses. For example, if a question tests objective #2 and #5, use [2, 5]' : ''}
 
 For mixed mode, vary both the question types AND the topics covered.`;
 
@@ -80,7 +81,15 @@ For mixed mode, vary both the question types AND the topics covered.`;
     }
 
     const parsed = JSON.parse(content);
-    const questions = parsed.questions || [];
+    let questions = parsed.questions || [];
+    
+    // Convert objective indices from 1-based (AI format) to 0-based (our internal format)
+    if (learningObjectives.length > 0) {
+      questions = questions.map((q: Question) => ({
+        ...q,
+        objectiveIndices: q.objectiveIndices?.map(idx => idx - 1) || []
+      }));
+    }
     
     // Shuffle the questions to randomize their order
     return shuffleArray(questions);

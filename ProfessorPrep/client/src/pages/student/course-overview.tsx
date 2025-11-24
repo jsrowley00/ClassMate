@@ -99,6 +99,8 @@ function ModuleItem({ module, childModules, objectives }: ModuleItemProps) {
 
 export default function CourseOverview() {
   const { id } = useParams<{ id: string }>();
+  const [isObjectivesExpanded, setIsObjectivesExpanded] = useState(false);
+  const [expandedObjectiveModules, setExpandedObjectiveModules] = useState<Set<string>>(new Set());
 
   const { data: course, isLoading: courseLoading } = useQuery<Course>({
     queryKey: [`/api/courses/${id}`],
@@ -115,6 +117,18 @@ export default function CourseOverview() {
   }>>({
     queryKey: [`/api/courses/${id}/learning-objectives`],
   });
+
+  const toggleObjectiveModule = (moduleId: string) => {
+    setExpandedObjectiveModules(prev => {
+      const next = new Set(prev);
+      if (next.has(moduleId)) {
+        next.delete(moduleId);
+      } else {
+        next.add(moduleId);
+      }
+      return next;
+    });
+  };
 
   if (courseLoading) {
     return (
@@ -167,15 +181,26 @@ export default function CourseOverview() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-objectives">
+        <Card 
+          data-testid="card-objectives"
+          className="cursor-pointer hover-elevate transition-shadow"
+          onClick={() => setIsObjectivesExpanded(!isObjectivesExpanded)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Learning Objectives</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              {isObjectivesExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalObjectives}</div>
             <p className="text-xs text-muted-foreground">
-              Objectives to master
+              Click to view by module
             </p>
           </CardContent>
         </Card>
@@ -193,6 +218,148 @@ export default function CourseOverview() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Learning Objectives by Module - Expanded View */}
+      {isObjectivesExpanded && !modulesLoading && (
+        <Card data-testid="card-objectives-expanded">
+          <CardHeader>
+            <CardTitle>Learning Objectives by Module</CardTitle>
+            <CardDescription>View all learning objectives organized by module and week</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {parentModules.map((parentModule) => {
+              const childModules = modules.filter(m => m.parentModuleId === parentModule.id);
+              const parentObjectives = objectives.find(obj => obj.moduleId === parentModule.id);
+              const isParentExpanded = expandedObjectiveModules.has(parentModule.id);
+
+              return (
+                <div key={parentModule.id} className="border rounded-md">
+                  <Collapsible
+                    open={isParentExpanded}
+                    onOpenChange={() => toggleObjectiveModule(parentModule.id)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start p-4 h-auto font-semibold hover-elevate"
+                      >
+                        {isParentExpanded ? (
+                          <ChevronDown className="h-4 w-4 mr-2 flex-shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 mr-2 flex-shrink-0" />
+                        )}
+                        <BookOpen className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
+                        <span className="text-left">{parentModule.name}</span>
+                        {parentObjectives && parentObjectives.objectives.length > 0 && (
+                          <span className="ml-auto text-xs text-muted-foreground font-normal">
+                            {parentObjectives.objectives.length} objectives
+                          </span>
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="px-4 pb-4 space-y-3">
+                        {/* Parent Module Objectives */}
+                        {parentObjectives && parentObjectives.objectives.length > 0 && (
+                          <div className="bg-muted/30 rounded-md p-3">
+                            <h4 className="text-sm font-semibold mb-2">Module Objectives</h4>
+                            <ul className="space-y-1.5">
+                              {parentObjectives.objectives.map((objective, idx) => (
+                                <li key={idx} className="flex gap-2 text-sm">
+                                  <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
+                                  <span>{objective}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Child Modules (Weeks) */}
+                        {childModules.length > 0 && (
+                          <div className="space-y-2 pl-4">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Weeks / Sub-modules
+                            </p>
+                            {childModules.map((childModule) => {
+                              const childObjectives = objectives.find(obj => obj.moduleId === childModule.id);
+                              const isChildExpanded = expandedObjectiveModules.has(childModule.id);
+
+                              return (
+                                <div key={childModule.id}>
+                                  <Collapsible
+                                    open={isChildExpanded}
+                                    onOpenChange={() => toggleObjectiveModule(childModule.id)}
+                                  >
+                                    <div className="border-l-2 border-border">
+                                      <CollapsibleTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          className="w-full justify-start p-3 h-auto text-sm hover-elevate"
+                                        >
+                                          {isChildExpanded ? (
+                                            <ChevronDown className="h-3 w-3 mr-2 flex-shrink-0" />
+                                          ) : (
+                                            <ChevronRight className="h-3 w-3 mr-2 flex-shrink-0" />
+                                          )}
+                                          <Calendar className="h-3 w-3 mr-2 text-muted-foreground flex-shrink-0" />
+                                          <span className="text-left font-medium">{childModule.name}</span>
+                                          {childObjectives && childObjectives.objectives.length > 0 && (
+                                            <span className="ml-auto text-xs text-muted-foreground font-normal">
+                                              {childObjectives.objectives.length} objectives
+                                            </span>
+                                          )}
+                                        </Button>
+                                      </CollapsibleTrigger>
+                                      <CollapsibleContent>
+                                        <div className="pl-6 pr-3 pb-3">
+                                          {childObjectives && childObjectives.objectives.length > 0 ? (
+                                            <div className="bg-muted/20 rounded-md p-3">
+                                              <ul className="space-y-1.5">
+                                                {childObjectives.objectives.map((objective, idx) => (
+                                                  <li key={idx} className="flex gap-2 text-sm">
+                                                    <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
+                                                    <span>{objective}</span>
+                                                  </li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          ) : (
+                                            <p className="text-xs text-muted-foreground italic pl-3">
+                                              No learning objectives yet
+                                            </p>
+                                          )}
+                                        </div>
+                                      </CollapsibleContent>
+                                    </div>
+                                  </Collapsible>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {!parentObjectives?.objectives.length && childModules.length === 0 && (
+                          <p className="text-sm text-muted-foreground italic text-center py-2">
+                            No learning objectives yet
+                          </p>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              );
+            })}
+            
+            {parentModules.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Target className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No modules with learning objectives yet</p>
+                <p className="text-sm mt-1">Learning objectives will appear as your professor adds course materials</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modules List */}
       {!modulesLoading && parentModules.length > 0 && (

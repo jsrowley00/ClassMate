@@ -346,6 +346,38 @@ export default function CourseDetail() {
     },
   });
 
+  const deleteModuleMutation = useMutation({
+    mutationFn: async (moduleId: string) => {
+      return await apiRequest("DELETE", `/api/courses/${id}/modules/${moduleId}`, undefined);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Module deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/courses", id, "modules"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courses", id, "materials"] });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete module",
+        variant: "destructive",
+      });
+    },
+  });
+
   const addStudentMutation = useMutation({
     mutationFn: async (email: string) => {
       return await apiRequest("POST", `/api/courses/${id}/students`, { email });
@@ -955,23 +987,54 @@ export default function CourseDetail() {
                     return (
                       <div key={parentModule.id} className="space-y-1">
                         <Collapsible open={isExpanded} onOpenChange={toggleModule}>
-                          <CollapsibleTrigger asChild>
-                            <div
-                              className="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover-elevate"
-                              data-testid={`module-item-${parentModule.id}`}
-                            >
-                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
-                              <Folder className="h-5 w-5 text-primary" />
-                              <div className="flex-1">
-                                <p className="font-medium">{parentModule.name}</p>
+                          <div className="flex items-center gap-2">
+                            <CollapsibleTrigger asChild>
+                              <div
+                                className="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover-elevate flex-1"
+                                data-testid={`module-item-${parentModule.id}`}
+                              >
+                                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                <Folder className="h-5 w-5 text-primary" />
+                                <div className="flex-1">
+                                  <p className="font-medium">{parentModule.name}</p>
+                                </div>
+                                {childModules.length > 0 && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {childModules.length}
+                                  </Badge>
+                                )}
                               </div>
-                              {childModules.length > 0 && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {childModules.length}
-                                </Badge>
-                              )}
-                            </div>
-                          </CollapsibleTrigger>
+                            </CollapsibleTrigger>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Module?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete "{parentModule.name}" and all its sub-modules. Any materials in this module will remain but will be moved to "No Module". This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteModuleMutation.mutate(parentModule.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                           <CollapsibleContent>
                             {/* Learning Objectives Section for Parent Module */}
                             <div className="ml-8 mt-2 mb-3 p-3 bg-muted/20 rounded-md border">
@@ -1015,18 +1078,49 @@ export default function CourseDetail() {
                                   return (
                                     <div key={childModule.id} className="space-y-2">
                                       <Collapsible open={isChildModuleExpanded} onOpenChange={toggleChildModule}>
-                                        <CollapsibleTrigger asChild>
-                                          <div
-                                            className="flex items-center gap-3 p-3 ml-8 border rounded-md bg-muted/30 cursor-pointer hover-elevate"
-                                            data-testid={`module-item-${childModule.id}`}
-                                          >
-                                            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isChildModuleExpanded ? 'rotate-0' : '-rotate-90'}`} />
-                                            <Folder className="h-4 w-4 text-muted-foreground" />
-                                            <div className="flex-1">
-                                              <p className="text-sm">{childModule.name}</p>
+                                        <div className="flex items-center gap-2 ml-8">
+                                          <CollapsibleTrigger asChild>
+                                            <div
+                                              className="flex items-center gap-3 p-3 border rounded-md bg-muted/30 cursor-pointer hover-elevate flex-1"
+                                              data-testid={`module-item-${childModule.id}`}
+                                            >
+                                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isChildModuleExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                              <Folder className="h-4 w-4 text-muted-foreground" />
+                                              <div className="flex-1">
+                                                <p className="text-sm">{childModule.name}</p>
+                                              </div>
                                             </div>
-                                          </div>
-                                        </CollapsibleTrigger>
+                                          </CollapsibleTrigger>
+                                          <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                              <AlertDialogHeader>
+                                                <AlertDialogTitle>Delete Week/Module?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                  This will permanently delete "{childModule.name}". Any materials in this module will remain but will be moved to "No Module". This action cannot be undone.
+                                                </AlertDialogDescription>
+                                              </AlertDialogHeader>
+                                              <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                  onClick={() => deleteModuleMutation.mutate(childModule.id)}
+                                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                >
+                                                  Delete
+                                                </AlertDialogAction>
+                                              </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                          </AlertDialog>
+                                        </div>
                                         
                                         <CollapsibleContent>
                                           {/* Learning Objectives for Child Module */}

@@ -118,6 +118,55 @@ export default function CourseOverview() {
     queryKey: [`/api/courses/${id}/learning-objectives`],
   });
 
+  const { data: progressData } = useQuery<{
+    progress: Array<{
+      moduleId: string;
+      objectives: Array<{
+        moduleId: string;
+        objectiveIndex: number;
+        objectiveText: string;
+        correctCount: number;
+        totalCount: number;
+        masteryPercentage: number;
+        lastEncountered: Date | null;
+      }>;
+    }>;
+  }>({
+    queryKey: [`/api/courses/${id}/student-progress`],
+  });
+
+  // Create a map for quick lookup of mastery data
+  const masteryMap = new Map<string, {
+    correctCount: number;
+    totalCount: number;
+    masteryPercentage: number;
+  }>();
+  
+  if (progressData?.progress) {
+    progressData.progress.forEach(moduleProgress => {
+      moduleProgress.objectives.forEach(obj => {
+        const key = `${obj.moduleId}-${obj.objectiveIndex}`;
+        masteryMap.set(key, {
+          correctCount: obj.correctCount,
+          totalCount: obj.totalCount,
+          masteryPercentage: obj.masteryPercentage,
+        });
+      });
+    });
+  }
+
+  const getMasteryColor = (percentage: number) => {
+    if (percentage >= 80) return 'bg-green-500';
+    if (percentage >= 60) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const getMasteryTextColor = (percentage: number) => {
+    if (percentage >= 80) return 'text-green-600';
+    if (percentage >= 60) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
   const toggleObjectiveModule = (moduleId: string) => {
     setExpandedObjectiveModules(prev => {
       const next = new Set(prev);
@@ -263,13 +312,44 @@ export default function CourseOverview() {
                         {parentObjectives && parentObjectives.objectives.length > 0 && (
                           <div className="bg-muted/30 rounded-md p-3">
                             <h4 className="text-sm font-semibold mb-2">Module Objectives</h4>
-                            <ul className="space-y-1.5">
-                              {parentObjectives.objectives.map((objective, idx) => (
-                                <li key={idx} className="flex gap-2 text-sm">
-                                  <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
-                                  <span>{objective}</span>
-                                </li>
-                              ))}
+                            <ul className="space-y-3">
+                              {parentObjectives.objectives.map((objective, idx) => {
+                                const masteryKey = `${parentModule.id}-${idx}`;
+                                const mastery = masteryMap.get(masteryKey);
+                                
+                                return (
+                                  <li key={idx} className="space-y-1.5">
+                                    <div className="flex gap-2 text-sm">
+                                      <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
+                                      <span className="flex-1">{objective}</span>
+                                    </div>
+                                    <div className="ml-6 space-y-1">
+                                      {mastery && mastery.totalCount > 0 ? (
+                                        <>
+                                          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                                            <div
+                                              className={`h-full transition-all ${getMasteryColor(mastery.masteryPercentage)}`}
+                                              style={{ width: `${mastery.masteryPercentage}%` }}
+                                            />
+                                          </div>
+                                          <div className="flex justify-between text-xs">
+                                            <span className={`font-medium ${getMasteryTextColor(mastery.masteryPercentage)}`}>
+                                              {mastery.masteryPercentage}% mastery
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                              {mastery.correctCount}/{mastery.totalCount} correct
+                                            </span>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <div className="text-xs text-muted-foreground italic">
+                                          Not yet attempted (0%)
+                                        </div>
+                                      )}
+                                    </div>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           </div>
                         )}
@@ -314,13 +394,44 @@ export default function CourseOverview() {
                                         <div className="pl-6 pr-3 pb-3">
                                           {childObjectives && childObjectives.objectives.length > 0 ? (
                                             <div className="bg-muted/20 rounded-md p-3">
-                                              <ul className="space-y-1.5">
-                                                {childObjectives.objectives.map((objective, idx) => (
-                                                  <li key={idx} className="flex gap-2 text-sm">
-                                                    <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
-                                                    <span>{objective}</span>
-                                                  </li>
-                                                ))}
+                                              <ul className="space-y-3">
+                                                {childObjectives.objectives.map((objective, idx) => {
+                                                  const masteryKey = `${childModule.id}-${idx}`;
+                                                  const mastery = masteryMap.get(masteryKey);
+                                                  
+                                                  return (
+                                                    <li key={idx} className="space-y-1.5">
+                                                      <div className="flex gap-2 text-sm">
+                                                        <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
+                                                        <span className="flex-1">{objective}</span>
+                                                      </div>
+                                                      <div className="ml-6 space-y-1">
+                                                        {mastery && mastery.totalCount > 0 ? (
+                                                          <>
+                                                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                                                              <div
+                                                                className={`h-full transition-all ${getMasteryColor(mastery.masteryPercentage)}`}
+                                                                style={{ width: `${mastery.masteryPercentage}%` }}
+                                                              />
+                                                            </div>
+                                                            <div className="flex justify-between text-xs">
+                                                              <span className={`font-medium ${getMasteryTextColor(mastery.masteryPercentage)}`}>
+                                                                {mastery.masteryPercentage}% mastery
+                                                              </span>
+                                                              <span className="text-muted-foreground">
+                                                                {mastery.correctCount}/{mastery.totalCount} correct
+                                                              </span>
+                                                            </div>
+                                                          </>
+                                                        ) : (
+                                                          <div className="text-xs text-muted-foreground italic">
+                                                            Not yet attempted (0%)
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    </li>
+                                                  );
+                                                })}
                                               </ul>
                                             </div>
                                           ) : (

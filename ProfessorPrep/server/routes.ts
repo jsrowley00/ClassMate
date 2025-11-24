@@ -973,8 +973,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not enrolled in this course" });
       }
 
-      // Get all learning objectives for this course
-      const allObjectives = await storage.getLearningObjectivesByCourse(id);
+      // Get ALL modules for this course
+      const allModules = await storage.getCourseModules(id);
+      
+      // Get canonical learning objectives for the entire course
+      const courseObjectives = await storage.getLearningObjectivesByCourse(id);
+      
+      // Create a map: moduleId -> objectives array for quick lookup
+      const objectivesMap = new Map<string, string[]>();
+      courseObjectives.forEach(obj => {
+        objectivesMap.set(obj.moduleId, obj.objectives);
+      });
       
       // Get student's mastery data
       const masteryData = await storage.getStudentObjectiveMastery(userId, id);
@@ -990,14 +999,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
 
-      // Build response with all objectives and their mastery levels
-      const progress = allObjectives.map(obj => {
-        const objectivesWithMastery = obj.objectives.map((objectiveText, index) => {
-          const key = `${obj.moduleId}-${index}`;
+      // Build response for ALL modules using canonical objectives
+      const progress = allModules.map((module) => {
+        const moduleObjectives = objectivesMap.get(module.id) || [];
+        
+        // Map each objective with its mastery data
+        const objectivesWithMastery = moduleObjectives.map((objectiveText, index) => {
+          const key = `${module.id}-${index}`;
           const mastery = masteryMap.get(key);
           
+          // Always return objective data, even if no mastery exists yet
           return {
-            moduleId: obj.moduleId,
+            moduleId: module.id,
             objectiveIndex: index,
             objectiveText,
             correctCount: mastery?.correctCount || 0,
@@ -1010,11 +1023,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         return {
-          moduleId: obj.moduleId,
+          moduleId: module.id,
           objectives: objectivesWithMastery,
         };
       });
 
+      // Return ALL modules with their canonical objectives
       res.json({ progress });
     } catch (error) {
       console.error("Error getting student progress:", error);

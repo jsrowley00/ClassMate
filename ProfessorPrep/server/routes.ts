@@ -6,6 +6,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generatePracticeTest, generateTutorResponse, categorizeQuestionsIntoTopics, evaluateShortAnswer, generateGlobalTutorResponse } from "./openai";
 import { insertCourseSchema, updateCourseSchema, insertCourseModuleSchema, insertCourseEnrollmentSchema, generateFlashcardsRequestSchema } from "@shared/schema";
+import { practiceTestLimiter, chatLimiter, flashcardLimiter, objectivesLimiter } from "./rateLimiting";
 import mammoth from "mammoth";
 import officeParser from "officeparser";
 import tmp from "tmp";
@@ -797,7 +798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Practice test routes
-  app.post('/api/courses/:id/practice/generate', isAuthenticated, async (req: any, res) => {
+  app.post('/api/courses/:id/practice/generate', isAuthenticated, practiceTestLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { testMode, questionCount: rawQuestionCount, moduleIds } = req.body;
@@ -1719,7 +1720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/courses/:id/chat', isAuthenticated, async (req: any, res) => {
+  app.post('/api/courses/:id/chat', isAuthenticated, chatLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { message } = req.body;
@@ -1964,7 +1965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/global-tutor/chat', isAuthenticated, async (req: any, res) => {
+  app.post('/api/global-tutor/chat', isAuthenticated, chatLimiter, async (req: any, res) => {
     try {
       const { message, sessionId } = req.body;
       const userId = req.user.claims.sub;
@@ -2075,7 +2076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Flashcard routes
   // Generate flashcards for a course
-  app.post('/api/courses/:id/flashcards/generate', isAuthenticated, async (req: any, res) => {
+  app.post('/api/courses/:id/flashcards/generate', isAuthenticated, flashcardLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -2299,7 +2300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Learning objectives routes
   // Auto-generate objectives for all modules in a course that have materials
-  app.post('/api/courses/:id/learning-objectives/generate-all', isAuthenticated, async (req: any, res) => {
+  app.post('/api/courses/:id/learning-objectives/generate-all', isAuthenticated, objectivesLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -2356,7 +2357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate learning objectives for a module
-  app.post('/api/modules/:moduleId/learning-objectives/generate', isAuthenticated, async (req: any, res) => {
+  app.post('/api/modules/:moduleId/learning-objectives/generate', isAuthenticated, objectivesLimiter, async (req: any, res) => {
     try {
       const { moduleId } = req.params;
       const userId = req.user.claims.sub;

@@ -54,6 +54,23 @@ Preferred communication style: Simple, everyday language.
 
 **Learning Objectives Integration**: Learning objectives guide all AI-generated content. Automatic fetching from selected modules or all course modules. Module ID validation prevents cross-course objective access. Objective mastery tracking uses waterfall progression: multi-objective questions update only the first non-mastered objective in course structure order, ensuring students master earlier concepts before progress moves to later ones.
 
+**AI Tutor Mastery Integration**: The AI tutor has complete access to student mastery tracking data, enabling personalized guidance based on exact progress. The tutor receives:
+1. Complete mastery status for all learning objectives (Developing/Approaching/Mastered)
+2. Explicit rubric blocker flags (hasRecentMajorMistake, reasoningQualitySatisfied)
+3. Demonstration counts and question format diversity per objective
+4. Waterfall priority identification (earliest non-mastered objective)
+
+The tutor provides targeted recommendations based on specific gaps:
+- For conceptual mistakes: Suggests reviewing materials and focusing on understanding
+- For low reasoning quality: Recommends explaining thinking more clearly
+- For format diversity: Directs students to practice tests with different question types
+- For demonstration counts: Encourages consistent practice test attempts
+
+Study tool recommendations are personalized to each student's needs:
+- Practice Tests: Critical for building demonstrations and trying multiple formats
+- Flashcards: Helpful for memorizing key terms and concepts
+- AI Tutor: Best for deep conceptual understanding when stuck on topics
+
 **Security Considerations**: Module ID validation ensures students can only access materials from courses they're enrolled in. Preview tokens expire and are cleaned periodically. Session cookies are HTTP-only, secure, and have 1-week max age.
 
 ## External Dependencies

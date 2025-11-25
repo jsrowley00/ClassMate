@@ -1,4 +1,4 @@
-import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles, ChevronDown, MessageSquarePlus, Bot } from "lucide-react";
+import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles, ChevronDown, MessageSquarePlus, MessageSquare, Bot } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -108,6 +108,12 @@ export function StudentSidebar() {
     enabled: isAuthenticated,
   });
 
+  // Fetch all global chat sessions
+  const { data: globalSessions = [] } = useQuery<Array<{ id: string; title: string; updatedAt: Date }>>({
+    queryKey: ["/api/global-tutor/sessions"],
+    enabled: isAuthenticated,
+  });
+
   const initials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
     : user?.email?.[0]?.toUpperCase() || "S";
@@ -159,6 +165,23 @@ export function StudentSidebar() {
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
+
+                      {/* Existing global chat sessions */}
+                      {globalSessions.map((session) => (
+                        <SidebarMenuSubItem key={session.id}>
+                          <SidebarMenuSubButton asChild data-active={location === `/global-tutor/${session.id}`}>
+                            <Link href={`/global-tutor/${session.id}`}>
+                              <MessageSquare className="h-4 w-4" />
+                              <span className="truncate">{session.title || "Untitled Chat"}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+
+                      {/* Separator if there are both global sessions and courses */}
+                      {globalSessions.length > 0 && courses.length > 0 && (
+                        <div className="my-2 border-t" />
+                      )}
 
                       {/* Course-specific tutors */}
                       {courses.map((course) => (

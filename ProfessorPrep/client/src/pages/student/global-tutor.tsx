@@ -45,6 +45,8 @@ export default function GlobalTutor() {
       setIsCreatingSession(true);
       try {
         const newSession = await apiRequest("POST", "/api/global-tutor/sessions/new", {}) as { id: string };
+        // Invalidate sessions list to refresh sidebar
+        queryClient.invalidateQueries({ queryKey: ["/api/global-tutor/sessions"] });
         setLocation(`/global-tutor/${newSession.id}`);
       } catch (error) {
         toast({

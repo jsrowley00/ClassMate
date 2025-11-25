@@ -125,6 +125,7 @@ export interface IStorage {
   // Practice attempt operations (for detailed mastery tracking)
   createPracticeAttempt(attempt: InsertPracticeAttempt): Promise<PracticeAttempt>;
   createShortAnswerEvaluation(evaluation: InsertShortAnswerEvaluation): Promise<ShortAnswerEvaluation>;
+  getPracticeAttemptsForObjective(studentId: string, moduleId: string, objectiveIndex: number): Promise<Array<PracticeAttempt & { evaluation?: ShortAnswerEvaluation }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -551,6 +552,8 @@ export class DatabaseStorage implements IStorage {
     objectiveText: string,
     wasCorrect: boolean
   ): Promise<void> {
+    const { evaluateObjectiveMastery } = await import('./masteryRubric');
+    
     // Check if a mastery record already exists for this student/objective
     const [existing] = await db
       .select()
@@ -563,8 +566,13 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
+    // Get all practice attempts for this objective to evaluate mastery
+    const attempts = await this.getPracticeAttemptsForObjective(studentId, moduleId, objectiveIndex);
+    const masteryResult = await evaluateObjectiveMastery(attempts);
+
     if (existing) {
-      // Update existing record
+      // Update existing record with new mastery calculation
+      const statusChanged = existing.status !== masteryResult.status;
       await db
         .update(objectiveMastery)
         .set({
@@ -572,6 +580,10 @@ export class DatabaseStorage implements IStorage {
           totalCount: existing.totalCount + 1,
           lastEncountered: new Date(),
           updatedAt: new Date(),
+          status: masteryResult.status,
+          streakCount: masteryResult.streakCount,
+          distinctFormatsCorrect: masteryResult.distinctFormatsCorrect,
+          lastStatusChange: statusChanged ? new Date() : existing.lastStatusChange,
         })
         .where(eq(objectiveMastery.id, existing.id));
     } else {
@@ -584,6 +596,9 @@ export class DatabaseStorage implements IStorage {
         objectiveText,
         correctCount: wasCorrect ? 1 : 0,
         totalCount: 1,
+        status: masteryResult.status,
+        streakCount: masteryResult.streakCount,
+        distinctFormatsCorrect: masteryResult.distinctFormatsCorrect,
       });
     }
   }
@@ -615,6 +630,42 @@ export class DatabaseStorage implements IStorage {
       .values(evaluationData)
       .returning();
     return evaluation;
+  }
+
+  async getPracticeAttemptsForObjective(
+    studentId: string,
+    moduleId: string,
+    objectiveIndex: number
+  ): Promise<Array<PracticeAttempt & { evaluation?: ShortAnswerEvaluation }>> {
+    // Get all attempts for this student
+    const attempts = await db
+      .select()
+      .from(practiceAttempts)
+      .where(eq(practiceAttempts.studentId, studentId))
+      .orderBy(desc(practiceAttempts.attemptedAt));
+
+    // Filter attempts that contain this specific moduleId and objectiveIndex
+    const relevantAttempts = attempts.filter(attempt => 
+      attempt.moduleIds.includes(moduleId) && 
+      attempt.objectiveIndices.includes(objectiveIndex)
+    );
+
+    // Get evaluations for short answer attempts
+    const attemptsWithEvaluations = await Promise.all(
+      relevantAttempts.map(async (attempt) => {
+        if (attempt.questionFormat === 'short_answer') {
+          const [evaluation] = await db
+            .select()
+            .from(shortAnswerEvaluations)
+            .where(eq(shortAnswerEvaluations.attemptId, attempt.id));
+          
+          return { ...attempt, evaluation };
+        }
+        return attempt;
+      })
+    );
+
+    return attemptsWithEvaluations;
   }
 }
 

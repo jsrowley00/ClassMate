@@ -130,6 +130,9 @@ export default function CourseOverview() {
         totalCount: number;
         masteryPercentage: number;
         lastEncountered: Date | null;
+        status: string;
+        explanation: string;
+        recommendation: string;
       }>;
     }>;
   }>({
@@ -141,6 +144,9 @@ export default function CourseOverview() {
     correctCount: number;
     totalCount: number;
     masteryPercentage: number;
+    status: string;
+    explanation: string;
+    recommendation: string;
   }>();
   
   if (progressData?.progress) {
@@ -151,21 +157,30 @@ export default function CourseOverview() {
           correctCount: obj.correctCount,
           totalCount: obj.totalCount,
           masteryPercentage: obj.masteryPercentage,
+          status: obj.status,
+          explanation: obj.explanation,
+          recommendation: obj.recommendation,
         });
       });
     });
   }
 
-  const getMasteryColor = (percentage: number) => {
-    if (percentage >= 80) return 'bg-green-500';
-    if (percentage >= 60) return 'bg-yellow-500';
+  const getMasteryColor = (status: string) => {
+    if (status === 'mastered') return 'bg-green-500';
+    if (status === 'approaching') return 'bg-yellow-500';
     return 'bg-red-500';
   };
 
-  const getMasteryTextColor = (percentage: number) => {
-    if (percentage >= 80) return 'text-green-600';
-    if (percentage >= 60) return 'text-yellow-600';
+  const getMasteryTextColor = (status: string) => {
+    if (status === 'mastered') return 'text-green-600';
+    if (status === 'approaching') return 'text-yellow-600';
     return 'text-red-600';
+  };
+
+  const getMasteryLabel = (status: string) => {
+    if (status === 'mastered') return 'Mastered';
+    if (status === 'approaching') return 'Approaching Mastery';
+    return 'Developing';
   };
 
   const toggleObjectiveModule = (moduleId: string) => {
@@ -324,27 +339,29 @@ export default function CourseOverview() {
                                       <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
                                       <span className="flex-1">{objective}</span>
                                     </div>
-                                    <div className="ml-6 space-y-1">
+                                    <div className="ml-6 space-y-2">
                                       {mastery && mastery.totalCount > 0 ? (
                                         <>
                                           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                             <div
-                                              className={`h-full transition-all ${getMasteryColor(mastery.masteryPercentage)}`}
+                                              className={`h-full transition-all ${getMasteryColor(mastery.status)}`}
                                               style={{ width: `${mastery.masteryPercentage}%` }}
                                             />
                                           </div>
                                           <div className="flex justify-between text-xs">
-                                            <span className={`font-medium ${getMasteryTextColor(mastery.masteryPercentage)}`}>
-                                              {mastery.masteryPercentage}% mastery
+                                            <span className={`font-semibold ${getMasteryTextColor(mastery.status)}`}>
+                                              {getMasteryLabel(mastery.status)}
                                             </span>
                                             <span className="text-muted-foreground">
                                               {mastery.correctCount}/{mastery.totalCount} correct
                                             </span>
                                           </div>
+                                          <p className="text-xs text-muted-foreground leading-relaxed">{mastery.explanation}</p>
+                                          <p className="text-xs text-foreground"><span className="font-medium">Next step:</span> {mastery.recommendation}</p>
                                         </>
                                       ) : (
                                         <div className="text-xs text-muted-foreground italic">
-                                          Not yet attempted (0%)
+                                          Not yet attempted
                                         </div>
                                       )}
                                     </div>
@@ -406,27 +423,29 @@ export default function CourseOverview() {
                                                         <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
                                                         <span className="flex-1">{objective}</span>
                                                       </div>
-                                                      <div className="ml-6 space-y-1">
+                                                      <div className="ml-6 space-y-2">
                                                         {mastery && mastery.totalCount > 0 ? (
                                                           <>
                                                             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                                               <div
-                                                                className={`h-full transition-all ${getMasteryColor(mastery.masteryPercentage)}`}
+                                                                className={`h-full transition-all ${getMasteryColor(mastery.status)}`}
                                                                 style={{ width: `${mastery.masteryPercentage}%` }}
                                                               />
                                                             </div>
                                                             <div className="flex justify-between text-xs">
-                                                              <span className={`font-medium ${getMasteryTextColor(mastery.masteryPercentage)}`}>
-                                                                {mastery.masteryPercentage}% mastery
+                                                              <span className={`font-semibold ${getMasteryTextColor(mastery.status)}`}>
+                                                                {getMasteryLabel(mastery.status)}
                                                               </span>
                                                               <span className="text-muted-foreground">
                                                                 {mastery.correctCount}/{mastery.totalCount} correct
                                                               </span>
                                                             </div>
+                                                            <p className="text-xs text-muted-foreground leading-relaxed">{mastery.explanation}</p>
+                                                            <p className="text-xs text-foreground"><span className="font-medium">Next step:</span> {mastery.recommendation}</p>
                                                           </>
                                                         ) : (
                                                           <div className="text-xs text-muted-foreground italic">
-                                                            Not yet attempted (0%)
+                                                            Not yet attempted
                                                           </div>
                                                         )}
                                                       </div>

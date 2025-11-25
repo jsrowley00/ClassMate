@@ -1037,20 +1037,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get student's mastery data
       const masteryData = await storage.getStudentObjectiveMastery(userId, id);
+      const { evaluateObjectiveMastery } = await import('./masteryRubric');
       
-      // Create a map for quick lookup: moduleId-objectiveIndex -> mastery data
-      const masteryMap = new Map<string, { correctCount: number; totalCount: number; lastEncountered: Date | null }>();
+      // Create a map for quick lookup: moduleId-objectiveIndex -> full mastery data
+      const masteryMap = new Map<string, typeof masteryData[0]>();
       masteryData.forEach(m => {
         const key = `${m.moduleId}-${m.objectiveIndex}`;
-        masteryMap.set(key, {
-          correctCount: m.correctCount,
-          totalCount: m.totalCount,
-          lastEncountered: m.lastEncountered,
-        });
+        masteryMap.set(key, m);
       });
 
       // Build response for ALL modules using canonical objectives
-      const progress = allModules.map((module) => {
+      const progress = await Promise.all(allModules.map(async (module) => {
         const moduleObjectives = objectivesMap.get(module.id);
         
         // Check if this module has objectives defined
@@ -1066,9 +1063,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Map each objective with its mastery data
-        const objectivesWithMastery = moduleObjectives.map((objectiveText, index) => {
+        const objectivesWithMastery = await Promise.all(moduleObjectives.map(async (objectiveText, index) => {
           const key = `${module.id}-${index}`;
           const mastery = masteryMap.get(key);
+          
+          // Get detailed mastery evaluation
+          let status = 'developing';
+          let explanation = 'No attempts recorded yet. Start practicing to track your progress.';
+          let recommendation = 'Take a practice test to begin demonstrating your understanding.';
+          
+          if (mastery) {
+            const attempts = await storage.getPracticeAttemptsForObjective(userId, module.id, index);
+            const masteryResult = await evaluateObjectiveMastery(attempts);
+            status = masteryResult.status;
+            explanation = masteryResult.explanation;
+            recommendation = masteryResult.recommendation;
+          }
           
           // Always return objective data, even if no mastery exists yet
           return {
@@ -1081,15 +1091,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ? Math.round((mastery.correctCount / mastery.totalCount) * 100)
               : 0,
             lastEncountered: mastery?.lastEncountered || null,
+            status,
+            explanation,
+            recommendation,
           };
-        });
+        }));
 
         return {
           moduleId: module.id,
           objectivesDefined: true,
           objectives: objectivesWithMastery,
         };
-      });
+      }));
 
       // Return ALL modules with their canonical objectives
       res.json({ progress });

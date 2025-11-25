@@ -228,11 +228,11 @@ export function StudentSidebar() {
                 </SidebarMenuItem>
               </Collapsible>
 
-              {/* Study Assistant - Global tutor chats */}
-              <Collapsible defaultOpen={isOnGlobalTutor} className="group/collapsible">
+              {/* Study Assistant - All AI tutors and global chats */}
+              <Collapsible defaultOpen={isOnGlobalTutor || isOnClassTutor || isOnStudyRoomTutor} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton data-active={isOnGlobalTutor}>
+                    <SidebarMenuButton data-active={isOnGlobalTutor || isOnClassTutor || isOnStudyRoomTutor}>
                       <Sparkles />
                       <span>Study Assistant</span>
                       <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
@@ -257,6 +257,40 @@ export function StudentSidebar() {
                             <Link href={`/global-tutor/${session.id}`}>
                               <MessageSquare className="h-4 w-4" />
                               <span className="truncate">{session.title || "Untitled Chat"}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+
+                      {/* Separator if there are global sessions and courses/rooms */}
+                      {globalSessions.length > 0 && (enrolledCourses.length > 0 || selfStudyRooms.length > 0) && (
+                        <div className="my-2 border-t" />
+                      )}
+
+                      {/* Class AI Tutors - pinned under course name */}
+                      {enrolledCourses.map((course) => (
+                        <SidebarMenuSubItem key={`tutor-${course.id}`}>
+                          <SidebarMenuSubButton asChild data-active={location === `/student/courses/${course.id}/tutor`}>
+                            <Link href={`/student/courses/${course.id}/tutor`}>
+                              <Bot className="h-4 w-4" />
+                              <span className="truncate">{course.name}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+
+                      {/* Separator between classes and study rooms */}
+                      {enrolledCourses.length > 0 && selfStudyRooms.length > 0 && (
+                        <div className="my-2 border-t" />
+                      )}
+
+                      {/* Study Room AI Tutors - pinned under room name */}
+                      {selfStudyRooms.map((room) => (
+                        <SidebarMenuSubItem key={`tutor-${room.id}`}>
+                          <SidebarMenuSubButton asChild data-active={location === `/student/courses/${room.id}/tutor`}>
+                            <Link href={`/student/courses/${room.id}/tutor`}>
+                              <Bot className="h-4 w-4" />
+                              <span className="truncate">{room.name}</span>
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

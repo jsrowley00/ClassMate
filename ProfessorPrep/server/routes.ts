@@ -1011,7 +1011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/practice-tests/:id/submit', isAuthenticated, checkStudentAccess, async (req: any, res) => {
+  app.post('/api/practice-tests/:id/submit', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { answers } = req.body;
@@ -1789,7 +1789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Chat routes
-  app.get('/api/courses/:id/chat', isAuthenticated, checkStudentAccess, async (req: any, res) => {
+  app.get('/api/courses/:id/chat', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -1807,13 +1807,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the owner to use the AI tutor." });
       }
 
-      let session = await storage.getChatSession(id, userId);
+      const session = await storage.getChatSession(id, userId);
       if (!session) {
-        session = await storage.createChatSession({
-          courseId: id,
-          studentId: userId,
-          title: "Chat Session",
-        });
+        // No existing session - return empty array (session will be created when user sends first message)
+        return res.json([]);
       }
 
       const messages = await storage.getChatMessages(session.id);
@@ -1824,6 +1821,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST creates new messages (and session if needed) - requires active access
   app.post('/api/courses/:id/chat', isAuthenticated, checkStudentAccess, chatLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -2035,7 +2033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all global chat sessions for the user
-  app.get('/api/global-tutor/sessions', isAuthenticated, checkStudentAccess, async (req: any, res) => {
+  app.get('/api/global-tutor/sessions', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const sessions = await storage.getAllGlobalChatSessions(userId);
@@ -2046,7 +2044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/global-tutor/chat', isAuthenticated, checkStudentAccess, async (req: any, res) => {
+  app.get('/api/global-tutor/chat', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { sessionId } = req.query;
@@ -2310,7 +2308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all flashcard sets for a course
-  app.get('/api/courses/:id/flashcards', isAuthenticated, checkStudentAccess, async (req: any, res) => {
+  app.get('/api/courses/:id/flashcards', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -2336,7 +2334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get flashcards in a set
-  app.get('/api/flashcards/sets/:setId', isAuthenticated, checkStudentAccess, async (req: any, res) => {
+  app.get('/api/flashcards/sets/:setId', isAuthenticated, async (req: any, res) => {
     try {
       const { setId } = req.params;
       const userId = req.user.claims.sub;

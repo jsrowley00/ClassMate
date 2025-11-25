@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Brain, FileText, GraduationCap, Zap, Users } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SignInButton } from "@clerk/clerk-react";
 
 export default function Landing() {
   return (
@@ -15,9 +16,9 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Button asChild data-testid="button-login">
-              <a href="/api/login">Sign In</a>
-            </Button>
+            <SignInButton mode="modal">
+              <Button data-testid="button-login">Sign In</Button>
+            </SignInButton>
           </div>
         </div>
       </header>
@@ -36,9 +37,9 @@ export default function Landing() {
               tutoring tailored to your professor's course content.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" asChild data-testid="button-get-started">
-                <a href="/api/login">Get Started</a>
-              </Button>
+              <SignInButton mode="modal">
+                <Button size="lg" data-testid="button-get-started">Get Started</Button>
+              </SignInButton>
               <Button size="lg" variant="outline" asChild>
                 <a href="#features">Learn More</a>
               </Button>
@@ -195,9 +196,9 @@ export default function Landing() {
           <p className="text-xl mb-8 opacity-90">
             Join thousands of students and professors using AI to achieve academic excellence.
           </p>
-          <Button size="lg" variant="secondary" asChild data-testid="button-cta-signup">
-            <a href="/api/login">Start Learning Today</a>
-          </Button>
+          <SignInButton mode="modal">
+            <Button size="lg" variant="secondary" data-testid="button-cta-signup">Start Learning Today</Button>
+          </SignInButton>
         </div>
       </section>
 

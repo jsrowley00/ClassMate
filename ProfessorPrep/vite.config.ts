@@ -19,6 +19,7 @@ export default defineConfig({
         ]
       : []),
   ],
+  envPrefix: ['VITE_', 'CLERK_'],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

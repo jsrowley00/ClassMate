@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -9,7 +10,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, ClipboardList, Target, TrendingUp, Calendar, CheckCircle2 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { BarChart3, ClipboardList, Target, TrendingUp, Calendar, CheckCircle2, ChevronDown } from "lucide-react";
 
 interface StudentAnalyticsDialogProps {
   open: boolean;
@@ -26,10 +32,16 @@ export function StudentAnalyticsDialog({
   studentId,
   studentName,
 }: StudentAnalyticsDialogProps) {
+  const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
+
   const { data: analytics, isLoading } = useQuery<any>({
     queryKey: [`/api/courses/${courseId}/students/${studentId}/analytics`],
     enabled: open && !!courseId && !!studentId,
   });
+
+  const toggleModule = (moduleId: string) => {
+    setOpenModules(prev => ({ ...prev, [moduleId]: !prev[moduleId] }));
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -152,58 +164,75 @@ export function StudentAnalyticsDialog({
                     </div>
 
                     {/* Per-Module Progress */}
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {analytics.learningObjectives.modules.map((module: any) => (
-                        <div key={module.moduleId} className="border rounded-md p-4">
-                          <h4 className="font-semibold mb-3">{module.moduleName}</h4>
-                          {module.objectivesDefined && module.objectives.length > 0 ? (
-                            <div className="space-y-2">
-                              {module.objectives.map((objective: any) => (
-                                <div
-                                  key={objective.objectiveIndex}
-                                  className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50"
-                                >
-                                  <div className="flex-shrink-0 mt-1">
-                                    {objective.status === 'mastered' ? (
-                                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                    ) : objective.status === 'developing' ? (
-                                      <div className="h-5 w-5 rounded-full border-2 border-orange-500 bg-orange-500/20" />
-                                    ) : (
-                                      <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm">{objective.objectiveText}</p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <Badge
-                                        variant={
-                                          objective.status === 'mastered' ? 'default' :
-                                          objective.status === 'developing' ? 'secondary' : 'outline'
-                                        }
-                                        className={
-                                          objective.status === 'mastered' ? 'bg-green-600' :
-                                          objective.status === 'developing' ? 'bg-orange-500' : ''
-                                        }
+                        <Collapsible
+                          key={module.moduleId}
+                          open={openModules[module.moduleId]}
+                          onOpenChange={() => toggleModule(module.moduleId)}
+                        >
+                          <div className="border rounded-md">
+                            <CollapsibleTrigger className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                              <h4 className="font-semibold text-left">{module.moduleName}</h4>
+                              <ChevronDown
+                                className={`h-5 w-5 transition-transform ${
+                                  openModules[module.moduleId] ? 'transform rotate-180' : ''
+                                }`}
+                              />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="px-4 pb-4">
+                                {module.objectivesDefined && module.objectives.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {module.objectives.map((objective: any) => (
+                                      <div
+                                        key={objective.objectiveIndex}
+                                        className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50"
                                       >
-                                        {objective.status === 'mastered' ? 'Mastered' :
-                                         objective.status === 'developing' ? 'Developing' : 'Not Started'}
-                                      </Badge>
-                                      {objective.totalAttempts > 0 && (
-                                        <span className="text-xs text-muted-foreground">
-                                          {objective.correctCount}/{objective.totalAttempts} correct
-                                        </span>
-                                      )}
-                                    </div>
+                                        <div className="flex-shrink-0 mt-1">
+                                          {objective.status === 'mastered' ? (
+                                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                          ) : objective.status === 'developing' ? (
+                                            <div className="h-5 w-5 rounded-full border-2 border-orange-500 bg-orange-500/20" />
+                                          ) : (
+                                            <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
+                                          )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm">{objective.objectiveText}</p>
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <Badge
+                                              variant={
+                                                objective.status === 'mastered' ? 'default' :
+                                                objective.status === 'developing' ? 'secondary' : 'outline'
+                                              }
+                                              className={
+                                                objective.status === 'mastered' ? 'bg-green-600' :
+                                                objective.status === 'developing' ? 'bg-orange-500' : ''
+                                              }
+                                            >
+                                              {objective.status === 'mastered' ? 'Mastered' :
+                                               objective.status === 'developing' ? 'Developing' : 'Not Started'}
+                                            </Badge>
+                                            {objective.totalAttempts > 0 && (
+                                              <span className="text-xs text-muted-foreground">
+                                                {objective.correctCount}/{objective.totalAttempts} correct
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">
-                              No learning objectives defined for this module yet
-                            </p>
-                          )}
-                        </div>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground text-center py-4">
+                                    No learning objectives defined for this module yet
+                                  </p>
+                                )}
+                              </div>
+                            </CollapsibleContent>
+                          </div>
+                        </Collapsible>
                       ))}
                     </div>
                   </div>

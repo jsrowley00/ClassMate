@@ -17,6 +17,7 @@ import {
   type UpsertUser,
   type Course,
   type InsertCourse,
+  type UpdateCourse,
   type CourseModule,
   type InsertCourseModule,
   type CourseMaterial,
@@ -56,7 +57,7 @@ export interface IStorage {
   getCoursesByProfessor(professorId: string): Promise<Course[]>;
   getCourse(id: string): Promise<Course | undefined>;
   createCourse(course: InsertCourse): Promise<Course>;
-  updateCourse(id: string, data: Partial<Course>): Promise<Course>;
+  updateCourse(id: string, data: UpdateCourse): Promise<Course>;
   deleteCourse(id: string): Promise<void>;
 
   // Module operations
@@ -179,7 +180,7 @@ export class DatabaseStorage implements IStorage {
     return course;
   }
 
-  async updateCourse(id: string, data: Partial<Course>): Promise<Course> {
+  async updateCourse(id: string, data: UpdateCourse): Promise<Course> {
     const [course] = await db
       .update(courses)
       .set({ ...data, updatedAt: new Date() })

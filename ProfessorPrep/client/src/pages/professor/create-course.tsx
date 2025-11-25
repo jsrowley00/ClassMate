@@ -50,7 +50,6 @@ export default function CreateCourse() {
     defaultValues: {
       name: "",
       description: "",
-      professorId: "",
     },
   });
 

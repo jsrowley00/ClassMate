@@ -5,7 +5,7 @@ import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generatePracticeTest, generateTutorResponse, categorizeQuestionsIntoTopics, evaluateShortAnswer } from "./openai";
-import { insertCourseSchema, insertCourseModuleSchema, insertCourseEnrollmentSchema, generateFlashcardsRequestSchema } from "@shared/schema";
+import { insertCourseSchema, updateCourseSchema, insertCourseModuleSchema, insertCourseEnrollmentSchema, generateFlashcardsRequestSchema } from "@shared/schema";
 import mammoth from "mammoth";
 import officeParser from "officeparser";
 import tmp from "tmp";
@@ -191,15 +191,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only the course professor can update this course" });
       }
 
-      const { name, description, startDate, endDate } = req.body;
-      const updateData: Partial<Course> = {};
+      const validated = updateCourseSchema.parse(req.body);
       
-      if (name !== undefined) updateData.name = name;
-      if (description !== undefined) updateData.description = description;
-      if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
-      if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
+      // Reject empty payloads - require at least one field to update
+      if (Object.keys(validated).length === 0) {
+        return res.status(400).json({ message: "At least one field must be provided to update" });
+      }
 
-      const updatedCourse = await storage.updateCourse(id, updateData);
+      const updatedCourse = await storage.updateCourse(id, validated);
       res.json(updatedCourse);
     } catch (error: any) {
       console.error("Error updating course:", error);

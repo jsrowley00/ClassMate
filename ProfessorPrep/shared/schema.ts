@@ -356,6 +356,46 @@ export const insertCourseSchema = createInsertSchema(courses).omit({
   updatedAt: true,
 });
 export type InsertCourse = z.infer<typeof insertCourseSchema>;
+
+const dateTransform = z.union([
+  z.string().transform((val, ctx) => {
+    if (val === "") return null;
+    const date = new Date(val);
+    if (isNaN(date.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.invalid_date,
+        message: "Invalid date format",
+      });
+      return z.NEVER;
+    }
+    return date;
+  }),
+  z.date().refine((date) => !isNaN(date.getTime()), {
+    message: "Invalid date",
+  }),
+  z.null()
+]);
+
+export const updateCourseSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  startDate: dateTransform.optional(),
+  endDate: dateTransform.optional(),
+}).refine(
+  (data) => {
+    // Only validate date order if both dates are valid Date objects (not null)
+    if (data.startDate instanceof Date && data.endDate instanceof Date) {
+      return data.endDate >= data.startDate;
+    }
+    return true;
+  },
+  {
+    message: "End date must be on or after start date",
+    path: ["endDate"],
+  }
+);
+export type UpdateCourse = z.infer<typeof updateCourseSchema>;
+
 export type Course = typeof courses.$inferSelect;
 
 export const insertCourseModuleSchema = createInsertSchema(courseModules).omit({

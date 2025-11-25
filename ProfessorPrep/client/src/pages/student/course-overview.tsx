@@ -337,7 +337,7 @@ export default function CourseOverview() {
                                       <span className="flex-1">{objective}</span>
                                     </div>
                                     {mastery && mastery.totalCount > 0 && (
-                                      <div className="ml-6 space-y-1">
+                                      <div className="ml-6 space-y-1 max-w-xs">
                                         <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                           <div
                                             className={`h-full transition-all ${getMasteryColor(mastery.status)}`}
@@ -413,7 +413,7 @@ export default function CourseOverview() {
                                                         <span className="flex-1">{objective}</span>
                                                       </div>
                                                       {mastery && mastery.totalCount > 0 && (
-                                                        <div className="ml-6 space-y-1">
+                                                        <div className="ml-6 space-y-1 max-w-xs">
                                                           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                                             <div
                                                               className={`h-full transition-all ${getMasteryColor(mastery.status)}`}

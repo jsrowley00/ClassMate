@@ -42,6 +42,8 @@ export const courses = pgTable("courses", {
   name: text("name").notNull(),
   description: text("description"),
   professorId: varchar("professor_id").notNull().references(() => users.id),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

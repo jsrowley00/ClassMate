@@ -51,8 +51,8 @@ export default function CourseDetail() {
   const [selectedParentModuleId, setSelectedParentModuleId] = useState<string | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
-  const [isTopicsExpanded, setIsTopicsExpanded] = useState(true);
-  const [isActivityExpanded, setIsActivityExpanded] = useState(true);
+  const [isTopicsExpanded, setIsTopicsExpanded] = useState(false);
+  const [isActivityExpanded, setIsActivityExpanded] = useState(false);
   const [isModulesListExpanded, setIsModulesListExpanded] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState("");

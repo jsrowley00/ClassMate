@@ -360,6 +360,10 @@ export const insertCourseSchema = createInsertSchema(courses).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  ownerId: z.string().optional(),
+  professorId: z.string().nullable().optional(),
+  courseType: z.enum(["professor", "self-study"]).optional(),
 });
 export type InsertCourse = z.infer<typeof insertCourseSchema>;
 

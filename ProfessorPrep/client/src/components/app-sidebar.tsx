@@ -1,4 +1,4 @@
-import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles, ChevronDown, MessageSquarePlus, MessageSquare, Bot } from "lucide-react";
+import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles, ChevronDown, MessageSquarePlus, MessageSquare, Bot, FolderOpen } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -102,11 +102,23 @@ export function StudentSidebar() {
   const [location] = useLocation();
   const { user, isAuthenticated } = useAuth();
 
-  // Fetch enrolled courses for the Study Assistant submenu
-  const { data: courses = [] } = useQuery<Course[]>({
+  // Fetch enrolled courses (all courses student has access to)
+  const { data: allCourses = [] } = useQuery<Course[]>({
     queryKey: ["/api/student/enrolled-courses"],
     enabled: isAuthenticated,
   });
+
+  // Fetch self-study rooms
+  const { data: selfStudyRoomsData = [] } = useQuery<Course[]>({
+    queryKey: ["/api/student/self-study-rooms"],
+    enabled: isAuthenticated,
+  });
+
+  // Filter to only professor-led courses (exclude self-study rooms)
+  const enrolledCourses = allCourses.filter(c => c.courseType === "professor");
+  
+  // Use self-study rooms from the dedicated endpoint
+  const selfStudyRooms = selfStudyRoomsData;
 
   // Fetch all global chat sessions
   const { data: globalSessions = [] } = useQuery<Array<{ id: string; title: string; updatedAt: Date }>>({
@@ -118,8 +130,14 @@ export function StudentSidebar() {
     ? `${user.firstName[0]}${user.lastName[0]}`
     : user?.email?.[0]?.toUpperCase() || "S";
 
-  // Check if we're on any global-tutor or course tutor page
-  const isOnStudyAssistant = location.startsWith("/global-tutor") || (location.includes("/courses/") && location.endsWith("/tutor"));
+  // Check if we're on various pages to control which sections are expanded
+  const isOnGlobalTutor = location.startsWith("/global-tutor");
+  const isOnClassTutor = location.includes("/courses/") && location.endsWith("/tutor") && 
+    enrolledCourses.some(c => location.includes(c.id));
+  const isOnStudyRoomTutor = location.includes("/courses/") && location.endsWith("/tutor") && 
+    selfStudyRooms.some(r => location.includes(r.id));
+  const isOnClassPage = enrolledCourses.some(c => location.includes(`/courses/${c.id}`));
+  const isOnStudyRoomPage = selfStudyRooms.some(r => location.includes(`/courses/${r.id}`));
 
   return (
     <Sidebar>
@@ -134,21 +152,119 @@ export function StudentSidebar() {
           <SidebarGroupLabel>Student Portal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {/* My Courses */}
+              {/* Dashboard */}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild data-active={location === "/"}>
                   <Link href="/">
-                    <BookOpen />
-                    <span>My Courses</span>
+                    <Home />
+                    <span>Dashboard</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {/* Study Assistant with collapsible submenu */}
-              <Collapsible defaultOpen={isOnStudyAssistant} className="group/collapsible">
+              {/* My Classes - Professor-led courses with AI tutors */}
+              <Collapsible defaultOpen={isOnClassPage || isOnClassTutor || enrolledCourses.length > 0} className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton data-active={isOnStudyAssistant}>
+                    <SidebarMenuButton data-active={isOnClassPage}>
+                      <BookOpen />
+                      <span>My Classes</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {enrolledCourses.length === 0 ? (
+                        <SidebarMenuSubItem>
+                          <span className="text-xs text-muted-foreground px-2 py-1">No classes yet</span>
+                        </SidebarMenuSubItem>
+                      ) : (
+                        enrolledCourses.map((course) => (
+                          <Collapsible key={course.id} defaultOpen={location.includes(course.id)} className="group/course">
+                            <SidebarMenuSubItem>
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuSubButton className="cursor-pointer" data-active={location === `/student/courses/${course.id}`}>
+                                  <BookOpen className="h-4 w-4" />
+                                  <span className="truncate flex-1">{course.name}</span>
+                                  <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]/course:rotate-180" />
+                                </SidebarMenuSubButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="pl-4">
+                                <SidebarMenuSubButton asChild data-active={location === `/student/courses/${course.id}`}>
+                                  <Link href={`/student/courses/${course.id}`}>
+                                    <span className="text-xs">Overview</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                                <SidebarMenuSubButton asChild data-active={location === `/student/courses/${course.id}/tutor`}>
+                                  <Link href={`/student/courses/${course.id}/tutor`}>
+                                    <Bot className="h-3 w-3" />
+                                    <span className="text-xs">AI Tutor</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </CollapsibleContent>
+                            </SidebarMenuSubItem>
+                          </Collapsible>
+                        ))
+                      )}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              {/* Study Rooms - Self-study rooms with AI tutors */}
+              <Collapsible defaultOpen={isOnStudyRoomPage || isOnStudyRoomTutor || selfStudyRooms.length > 0} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton data-active={isOnStudyRoomPage}>
+                      <FolderOpen />
+                      <span>Study Rooms</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {selfStudyRooms.length === 0 ? (
+                        <SidebarMenuSubItem>
+                          <span className="text-xs text-muted-foreground px-2 py-1">No study rooms yet</span>
+                        </SidebarMenuSubItem>
+                      ) : (
+                        selfStudyRooms.map((room) => (
+                          <Collapsible key={room.id} defaultOpen={location.includes(room.id)} className="group/room">
+                            <SidebarMenuSubItem>
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuSubButton className="cursor-pointer" data-active={location === `/student/courses/${room.id}`}>
+                                  <FolderOpen className="h-4 w-4" />
+                                  <span className="truncate flex-1">{room.name}</span>
+                                  <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]/room:rotate-180" />
+                                </SidebarMenuSubButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="pl-4">
+                                <SidebarMenuSubButton asChild data-active={location === `/student/courses/${room.id}`}>
+                                  <Link href={`/student/courses/${room.id}`}>
+                                    <span className="text-xs">Overview</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                                <SidebarMenuSubButton asChild data-active={location === `/student/courses/${room.id}/tutor`}>
+                                  <Link href={`/student/courses/${room.id}/tutor`}>
+                                    <Bot className="h-3 w-3" />
+                                    <span className="text-xs">AI Tutor</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </CollapsibleContent>
+                            </SidebarMenuSubItem>
+                          </Collapsible>
+                        ))
+                      )}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              {/* Study Assistant - Global tutor chats */}
+              <Collapsible defaultOpen={isOnGlobalTutor} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton data-active={isOnGlobalTutor}>
                       <Sparkles />
                       <span>Study Assistant</span>
                       <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
@@ -173,23 +289,6 @@ export function StudentSidebar() {
                             <Link href={`/global-tutor/${session.id}`}>
                               <MessageSquare className="h-4 w-4" />
                               <span className="truncate">{session.title || "Untitled Chat"}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-
-                      {/* Separator if there are both global sessions and courses */}
-                      {globalSessions.length > 0 && courses.length > 0 && (
-                        <div className="my-2 border-t" />
-                      )}
-
-                      {/* Course-specific tutors */}
-                      {courses.map((course) => (
-                        <SidebarMenuSubItem key={course.id}>
-                          <SidebarMenuSubButton asChild>
-                            <Link href={`/student/courses/${course.id}/tutor`}>
-                              <Bot className="h-4 w-4" />
-                              <span className="truncate">{course.name}</span>
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

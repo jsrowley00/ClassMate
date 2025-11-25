@@ -121,7 +121,7 @@ async function checkStudentAccess(req: any, res: any, next: any) {
     const expiresAt = new Date(user.subscriptionExpiresAt);
     if (expiresAt <= new Date()) {
       return res.status(403).json({ 
-        message: "Your 4-month access period has expired. Please purchase again to continue.",
+        message: "Your 4 months has ended. You can view past materials, or resubscribe to be added to new materials or courses.",
         accessExpired: true,
         expiresAt: user.subscriptionExpiresAt
       });

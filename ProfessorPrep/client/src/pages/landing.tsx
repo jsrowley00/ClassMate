@@ -37,7 +37,7 @@ export default function Landing() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" asChild data-testid="button-get-started">
-                <a href="/api/login">Get Started Free</a>
+                <a href="/api/login">Get Started</a>
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <a href="#features">Learn More</a>

@@ -100,18 +100,21 @@ export function ProfessorSidebar() {
 
 export function StudentSidebar() {
   const [location] = useLocation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isStudent } = useAuth();
+
+  // Only fetch data if user is authenticated AND has student role
+  const shouldFetch = isAuthenticated && isStudent;
 
   // Fetch enrolled courses (all courses student has access to)
   const { data: allCourses = [] } = useQuery<Course[]>({
     queryKey: ["/api/student/enrolled-courses"],
-    enabled: isAuthenticated,
+    enabled: shouldFetch,
   });
 
   // Fetch self-study rooms
   const { data: selfStudyRoomsData = [] } = useQuery<Course[]>({
     queryKey: ["/api/student/self-study-rooms"],
-    enabled: isAuthenticated,
+    enabled: shouldFetch,
   });
 
   // Filter to only professor-led courses (exclude self-study rooms)
@@ -123,7 +126,7 @@ export function StudentSidebar() {
   // Fetch all global chat sessions
   const { data: globalSessions = [] } = useQuery<Array<{ id: string; title: string; updatedAt: Date }>>({
     queryKey: ["/api/global-tutor/sessions"],
-    enabled: isAuthenticated,
+    enabled: shouldFetch,
   });
 
   const initials = user?.firstName && user?.lastName

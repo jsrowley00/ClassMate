@@ -336,8 +336,8 @@ export default function CourseOverview() {
                                       <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
                                       <span className="flex-1">{objective}</span>
                                     </div>
-                                    {mastery && mastery.totalCount > 0 && (
-                                      <div className="ml-6 space-y-1 max-w-xs">
+                                    {mastery && mastery.totalCount > 0 ? (
+                                      <div className={`ml-6 space-y-1 ${mastery.status === 'mastered' ? '' : 'max-w-xs'}`}>
                                         <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                           <div
                                             className={`h-full transition-all ${getMasteryColor(mastery.status)}`}
@@ -352,6 +352,10 @@ export default function CourseOverview() {
                                             {mastery.correctCount}/{mastery.totalCount} correct
                                           </span>
                                         </div>
+                                      </div>
+                                    ) : (
+                                      <div className="ml-6 text-xs text-muted-foreground">
+                                        Not Started
                                       </div>
                                     )}
                                   </li>
@@ -412,8 +416,8 @@ export default function CourseOverview() {
                                                         <span className="text-muted-foreground flex-shrink-0">{idx + 1}.</span>
                                                         <span className="flex-1">{objective}</span>
                                                       </div>
-                                                      {mastery && mastery.totalCount > 0 && (
-                                                        <div className="ml-6 space-y-1 max-w-xs">
+                                                      {mastery && mastery.totalCount > 0 ? (
+                                                        <div className={`ml-6 space-y-1 ${mastery.status === 'mastered' ? '' : 'max-w-xs'}`}>
                                                           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                                             <div
                                                               className={`h-full transition-all ${getMasteryColor(mastery.status)}`}
@@ -428,6 +432,10 @@ export default function CourseOverview() {
                                                               {mastery.correctCount}/{mastery.totalCount} correct
                                                             </span>
                                                           </div>
+                                                        </div>
+                                                      ) : (
+                                                        <div className="ml-6 text-xs text-muted-foreground">
+                                                          Not Started
                                                         </div>
                                                       )}
                                                     </li>

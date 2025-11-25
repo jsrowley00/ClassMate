@@ -103,7 +103,7 @@ function Router() {
               <Switch>
                 <Route path="/" component={StudentDashboard} />
                 <Route path="/student/profile" component={StudentProfile} />
-                <Route path="/global-tutor" component={GlobalTutor} />
+                <Route path="/global-tutor/:sessionId?" component={GlobalTutor} />
                 
                 {/* Standalone course pages (no tabs) */}
                 <Route path="/student/courses/:id/enroll" component={EnrollCourse} />

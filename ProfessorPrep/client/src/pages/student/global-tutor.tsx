@@ -10,16 +10,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Send, Bot, User, Sparkles } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useParams, useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ChatMessage } from "@shared/schema";
 
 export default function GlobalTutor() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { sessionId } = useParams<{ sessionId?: string }>();
+  const [, setLocation] = useLocation();
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -34,18 +37,47 @@ export default function GlobalTutor() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
+  // Create a new session if no sessionId is provided (coming from "New Chat")
+  useEffect(() => {
+    if (!isAuthenticated || authLoading || sessionId || isCreatingSession) return;
+
+    const createSession = async () => {
+      setIsCreatingSession(true);
+      try {
+        const newSession = await apiRequest("POST", "/api/global-tutor/sessions/new", {}) as { id: string };
+        setLocation(`/global-tutor/${newSession.id}`);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to create chat session",
+          variant: "destructive",
+        });
+      } finally {
+        setIsCreatingSession(false);
+      }
+    };
+
+    createSession();
+  }, [isAuthenticated, authLoading, sessionId, isCreatingSession, setLocation, toast]);
+
   const { data: messages, isLoading: messagesLoading } = useQuery<ChatMessage[]>({
-    queryKey: ["/api/global-tutor/chat"],
-    enabled: isAuthenticated,
+    queryKey: ["/api/global-tutor/chat", sessionId],
+    queryFn: async () => {
+      if (!sessionId) return [];
+      const result = await apiRequest("GET", `/api/global-tutor/chat?sessionId=${sessionId}`, undefined);
+      return result as ChatMessage[];
+    },
+    enabled: isAuthenticated && !!sessionId,
   });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      return await apiRequest("POST", `/api/global-tutor/chat`, { message: content });
+      if (!sessionId) throw new Error("No session ID");
+      return await apiRequest("POST", `/api/global-tutor/chat`, { message: content, sessionId });
     },
     onSuccess: () => {
       setMessage("");
-      queryClient.invalidateQueries({ queryKey: ["/api/global-tutor/chat"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/global-tutor/chat", sessionId] });
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {

@@ -10,6 +10,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@clerk/clerk-react": "^5.57.0",
+    "@clerk/express": "^1.7.53",
     "express-rate-limit": "^8.2.1",
     "openai": "^6.9.1",
     "stripe": "^20.0.0",

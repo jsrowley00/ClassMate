@@ -338,11 +338,11 @@ export default function CourseOverview() {
                                     </div>
                                     <div className="ml-6 space-y-1">
                                       {mastery && mastery.totalCount > 0 ? (
-                                        <div className={mastery.status === 'mastered' ? '' : 'max-w-xs'}>
+                                        <>
                                           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                             <div
                                               className={`h-full transition-all ${getMasteryColor(mastery.status)}`}
-                                              style={{ width: `${mastery.masteryPercentage}%` }}
+                                              style={{ width: mastery.status === 'mastered' ? `${mastery.masteryPercentage}%` : '50%' }}
                                             />
                                           </div>
                                           <div className="flex justify-between text-xs">
@@ -353,7 +353,7 @@ export default function CourseOverview() {
                                               {mastery.correctCount}/{mastery.totalCount} correct
                                             </span>
                                           </div>
-                                        </div>
+                                        </>
                                       ) : (
                                         <div className="flex justify-between text-xs">
                                           <span className="text-muted-foreground">Not Started</span>
@@ -421,11 +421,11 @@ export default function CourseOverview() {
                                                       </div>
                                                       <div className="ml-6 space-y-1">
                                                         {mastery && mastery.totalCount > 0 ? (
-                                                          <div className={mastery.status === 'mastered' ? '' : 'max-w-xs'}>
+                                                          <>
                                                             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                                                               <div
                                                                 className={`h-full transition-all ${getMasteryColor(mastery.status)}`}
-                                                                style={{ width: `${mastery.masteryPercentage}%` }}
+                                                                style={{ width: mastery.status === 'mastered' ? `${mastery.masteryPercentage}%` : '50%' }}
                                                               />
                                                             </div>
                                                             <div className="flex justify-between text-xs">
@@ -436,7 +436,7 @@ export default function CourseOverview() {
                                                                 {mastery.correctCount}/{mastery.totalCount} correct
                                                               </span>
                                                             </div>
-                                                          </div>
+                                                          </>
                                                         ) : (
                                                           <div className="flex justify-between text-xs">
                                                             <span className="text-muted-foreground">Not Started</span>

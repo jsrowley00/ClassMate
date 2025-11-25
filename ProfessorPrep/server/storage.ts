@@ -595,6 +595,8 @@ export class DatabaseStorage implements IStorage {
           streakCount: masteryResult.streakCount,
           distinctFormatsCorrect: masteryResult.distinctFormatsCorrect,
           lastStatusChange: statusChanged ? new Date() : existing.lastStatusChange,
+          hasRecentMajorMistake: masteryResult.hasRecentMajorMistake,
+          reasoningQualitySatisfied: masteryResult.reasoningQualitySatisfied,
         })
         .where(eq(objectiveMastery.id, existing.id));
     } else {
@@ -610,6 +612,8 @@ export class DatabaseStorage implements IStorage {
         status: masteryResult.status,
         streakCount: masteryResult.streakCount,
         distinctFormatsCorrect: masteryResult.distinctFormatsCorrect,
+        hasRecentMajorMistake: masteryResult.hasRecentMajorMistake,
+        reasoningQualitySatisfied: masteryResult.reasoningQualitySatisfied,
       });
     }
   }

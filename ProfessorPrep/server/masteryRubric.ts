@@ -8,6 +8,8 @@ export interface MasteryResult {
   recommendation: string;
   streakCount: number;
   distinctFormatsCorrect: string[];
+  hasRecentMajorMistake: boolean;
+  reasoningQualitySatisfied: boolean;
 }
 
 export async function evaluateObjectiveMastery(
@@ -20,6 +22,8 @@ export async function evaluateObjectiveMastery(
       recommendation: "Take a practice test to begin demonstrating your understanding.",
       streakCount: 0,
       distinctFormatsCorrect: [],
+      hasRecentMajorMistake: false,
+      reasoningQualitySatisfied: true,
     };
   }
 
@@ -66,6 +70,8 @@ export async function evaluateObjectiveMastery(
       recommendation: "Excellent work! Continue practicing other objectives or challenge yourself with more advanced topics.",
       streakCount: currentStreak,
       distinctFormatsCorrect,
+      hasRecentMajorMistake: false,
+      reasoningQualitySatisfied: true,
     };
   }
 
@@ -86,6 +92,8 @@ export async function evaluateObjectiveMastery(
         : "Keep practicing to build consistency. Aim for a few more correct answers to demonstrate mastery.",
       streakCount: currentStreak,
       distinctFormatsCorrect,
+      hasRecentMajorMistake: false,
+      reasoningQualitySatisfied: !hasLowReasoningQuality,
     };
   }
 
@@ -106,5 +114,7 @@ export async function evaluateObjectiveMastery(
       : "Take more practice tests and use the AI tutor if you need help understanding specific topics.",
     streakCount: currentStreak,
     distinctFormatsCorrect,
+    hasRecentMajorMistake: hasRecentMistakes,
+    reasoningQualitySatisfied: !hasLowReasoningQuality,
   };
 }

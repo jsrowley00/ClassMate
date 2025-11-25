@@ -160,6 +160,9 @@ export const objectiveMastery = pgTable("objective_mastery", {
   streakCount: integer("streak_count").notNull().default(0), // Current streak of correct answers
   distinctFormatsCorrect: text("distinct_formats_correct").array().default(sql`ARRAY[]::text[]`), // Array of question formats answered correctly
   lastStatusChange: timestamp("last_status_change").defaultNow(),
+  // Explicit rubric blockers for AI tutor guidance
+  hasRecentMajorMistake: boolean("has_recent_major_mistake").notNull().default(false), // Whether student has conceptual errors in last 2 attempts
+  reasoningQualitySatisfied: boolean("reasoning_quality_satisfied").notNull().default(true), // Whether reasoning quality meets rubric standard (no low-quality correct answers)
 });
 
 // Practice attempts table - logs each individual question attempt for detailed tracking

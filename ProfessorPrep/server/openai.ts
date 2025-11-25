@@ -410,7 +410,8 @@ export async function generateTutorResponse(
   materialContent: string,
   conversationHistory: { role: string; content: string }[] = [],
   missedQuestions: { question: string; studentAnswer: string; correctAnswer: string }[] = [],
-  learningObjectives: string[] = []
+  learningObjectives: string[] = [],
+  masteryRecords: any[] = []
 ): Promise<string> {
   try {
     let learningObjectivesSection = "";
@@ -423,6 +424,97 @@ ${cappedObjectives.map((obj, idx) => `${idx + 1}. ${obj}`).join('\n')}
 
 When helping students, guide them toward mastering these objectives through Socratic questioning.
 `;
+    }
+
+    let masteryProgressSection = "";
+    if (masteryRecords.length > 0) {
+      // Filter out invalid records and group by mastery status (three-tier system)
+      const validRecords = masteryRecords.filter(m => m.status && m.objectiveText);
+      const mastered = validRecords.filter(m => m.status === 'mastered');
+      const approaching = validRecords.filter(m => m.status === 'approaching');
+      const developing = validRecords.filter(m => m.status === 'developing');
+      
+      // Identify the earliest non-mastered objective (waterfall priority)
+      const nonMastered = [...developing, ...approaching];
+      const priorityObjective = nonMastered.length > 0 ? nonMastered[0] : null;
+      
+      masteryProgressSection = `\n\nSTUDENT MASTERY PROGRESS:
+This student's current progress on learning objectives (based on rigorous rubric: 3+ correct demonstrations, 2+ question formats, quality reasoning, no recent conceptual mistakes):
+
+${mastered.length > 0 ? `MASTERED (${mastered.length} objectives - fully achieved):
+${mastered.map(m => `✓ ${m.objectiveText || 'Unknown objective'}`).join('\n')}
+` : ''}
+${approaching.length > 0 ? `APPROACHING MASTERY (${approaching.length} objectives - close to mastery, specific blockers identified):
+${approaching.map(m => {
+  const correctCount = m.correctCount || 0;
+  const formatsCount = m.distinctFormatsCorrect?.length || 0;
+  const hints = [];
+  
+  // Check explicit rubric blockers first
+  if (m.hasRecentMajorMistake) hints.push('BLOCKED by recent conceptual mistakes');
+  if (!m.reasoningQualitySatisfied) hints.push('BLOCKED by low reasoning quality');
+  
+  // Then check count/format gaps
+  if (formatsCount < 2) hints.push(`needs ${2 - formatsCount} more question format${2 - formatsCount > 1 ? 's' : ''}`);
+  if (correctCount < 3) hints.push(`has ${correctCount}/3 demonstrations`);
+  
+  return `• ${m.objectiveText || 'Unknown objective'}${hints.length > 0 ? ` (${hints.join(', ')})` : ''}`;
+}).join('\n')}
+` : ''}
+${developing.length > 0 ? `DEVELOPING (${developing.length} objectives - needs significant practice):
+${developing.map(m => {
+  const correctCount = m.correctCount || 0;
+  const formatsCount = m.distinctFormatsCorrect?.length || 0;
+  const hints = [];
+  
+  // Check explicit rubric blockers first  
+  if (m.hasRecentMajorMistake) hints.push('has recent conceptual mistakes');
+  if (!m.reasoningQualitySatisfied) hints.push('low reasoning quality');
+  
+  // Then check count/format gaps
+  if (formatsCount === 0) hints.push('no correct formats yet');
+  else if (formatsCount < 2) hints.push(`needs ${2 - formatsCount} more question format${2 - formatsCount > 1 ? 's' : ''}`);
+  if (correctCount < 3) hints.push(`has ${correctCount}/3 demonstrations`);
+  
+  return `• ${m.objectiveText || 'Unknown objective'}${hints.length > 0 ? ` (${hints.join(', ')})` : ''}`;
+}).join('\n')}
+` : ''}
+${priorityObjective ? `
+WATERFALL PRIORITY - FOCUS HERE FIRST:
+The earliest non-mastered objective is: "${priorityObjective.objectiveText}"
+${priorityObjective.status === 'approaching' ? `Status: APPROACHING (very close to mastery)` : `Status: DEVELOPING (needs significant work)`}
+${(() => {
+  const correctCount = priorityObjective.correctCount || 0;
+  const formatsCount = priorityObjective.distinctFormatsCorrect?.length || 0;
+  const gaps = [];
+  
+  // Check explicit rubric blockers first - these are CRITICAL
+  if (priorityObjective.hasRecentMajorMistake) {
+    gaps.push('MUST fix recent conceptual mistakes (review materials, understand concepts deeply)');
+  }
+  if (!priorityObjective.reasoningQualitySatisfied) {
+    gaps.push('MUST improve reasoning quality (explain thinking clearly, avoid shortcuts)');
+  }
+  
+  // Then check count/format gaps
+  if (correctCount < 3) gaps.push(`need ${3 - correctCount} more correct demonstration${3 - correctCount > 1 ? 's' : ''}`);
+  if (formatsCount < 2) gaps.push(`need ${2 - formatsCount} more question format${2 - formatsCount > 1 ? 's' : ''}`);
+  
+  return `What they need: ${gaps.length > 0 ? gaps.join(' AND ') : 'continue practicing'}`;
+})()}
+
+ACTION: When students ask what to study or where to focus, DIRECT them to this specific objective first.
+` : ''}
+IMPORTANT GUIDANCE STRATEGIES:
+- WATERFALL RULE: Due to waterfall mastery tracking, students must master objectives in course order. ALWAYS prioritize the earliest non-mastered objective shown above.
+- For MASTERED objectives: Celebrate briefly, then redirect focus to priority objective
+- For APPROACHING objectives: They're very close! 1-2 more practice test attempts with different question formats should achieve mastery
+- For DEVELOPING objectives: Need consistent practice tests to build demonstrations (correct answers) across multiple question formats (multiple choice, short answer, fill-in-blank)
+- When students ask what to study: PROACTIVELY name the priority objective and recommend:
+  * "Practice Tests" - CRITICAL for building demonstrations and trying different question formats
+  * "Flashcards" - Helpful for memorizing key terms and concepts
+  * "AI Tutor" (current tool) - Best for deep conceptual understanding when stuck
+- Be specific: "Let's focus on [priority objective name]. I recommend taking a practice test to build more demonstrations in different formats."`;
     }
 
     let missedQuestionsContext = "";
@@ -481,7 +573,7 @@ CELEBRATE UNDERSTANDING & NEXT STEPS:
 - Only offer this once per conversation to avoid being repetitive
 
 If the student asks something unrelated to the course material, gently redirect them back to course topics.
-${learningObjectivesSection}
+${learningObjectivesSection}${masteryProgressSection}
 Course Material:
 ${materialContent}${missedQuestionsContext}`,
       },

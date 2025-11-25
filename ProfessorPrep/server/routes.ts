@@ -1877,13 +1877,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allObjectives = await storage.getLearningObjectivesByCourse(id);
       const learningObjectives = allObjectives.flatMap(obj => obj.objectives);
 
-      // Generate AI response with awareness of what the student struggled with
+      // Fetch student's mastery progress for all objectives
+      const masteryRecords = await storage.getStudentObjectiveMastery(userId, id);
+      
+      // Sort by objectiveIndex to ensure waterfall ordering (earliest objectives first)
+      const sortedMasteryRecords = masteryRecords.sort((a, b) => a.objectiveIndex - b.objectiveIndex);
+
+      // Generate AI response with awareness of what the student struggled with AND their mastery progress
       const aiResponse = await generateTutorResponse(
         message.trim(), 
         combinedContent, 
         conversationHistory,
         recentMissedQuestions,
-        learningObjectives
+        learningObjectives,
+        sortedMasteryRecords
       );
 
       // Save AI message

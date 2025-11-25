@@ -396,12 +396,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Check if user is professor of the course or enrolled student
-      const isProfessor = course.professorId === userId;
+      // Check if user is owner (professor or self-study room creator) or enrolled student
+      const isOwner = course.ownerId === userId;
       const isEnrolled = await storage.isEnrolled(userId, id);
       
-      if (!isProfessor && !isEnrolled) {
-        return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the professor." });
+      if (!isOwner && !isEnrolled) {
+        return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the owner." });
       }
 
       const materials = await storage.getCourseMaterials(id);
@@ -430,9 +430,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = req.user.claims.sub;
       const isEnrolled = await storage.isEnrolled(userId, material.courseId);
-      const isProfessor = course.professorId === userId;
+      const isOwner = course.ownerId === userId;
 
-      if (!isEnrolled && !isProfessor) {
+      if (!isEnrolled && !isOwner) {
         return res.status(403).json({ message: "You don't have access to this material" });
       }
 
@@ -858,12 +858,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Check if user is professor of the course or enrolled student
-      const isProfessor = course.professorId === userId;
+      // Check if user is owner (professor or self-study room creator) or enrolled student
+      const isOwner = course.ownerId === userId;
       const isEnrolled = await storage.isEnrolled(userId, id);
       
-      if (!isProfessor && !isEnrolled) {
-        return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the professor to generate practice tests." });
+      if (!isOwner && !isEnrolled) {
+        return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the owner to generate practice tests." });
       }
 
       const allMaterials = await storage.getCourseMaterials(id);
@@ -1736,12 +1736,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Check if user is professor of the course or enrolled student
-      const isProfessor = course.professorId === userId;
+      // Check if user is owner (professor or self-study room creator) or enrolled student
+      const isOwner = course.ownerId === userId;
       const isEnrolled = await storage.isEnrolled(userId, id);
       
-      if (!isProfessor && !isEnrolled) {
-        return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the professor to use the AI tutor." });
+      if (!isOwner && !isEnrolled) {
+        return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the owner to use the AI tutor." });
       }
 
       let session = await storage.getChatSession(id, userId);
@@ -1776,12 +1776,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Check if user is professor of the course or enrolled student
-      const isProfessor = course.professorId === userId;
+      // Check if user is owner (professor or self-study room creator) or enrolled student
+      const isOwner = course.ownerId === userId;
       const isEnrolled = await storage.isEnrolled(userId, id);
       
-      if (!isProfessor && !isEnrolled) {
-        return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the professor to use the AI tutor." });
+      if (!isOwner && !isEnrolled) {
+        return res.status(403).json({ message: "Access denied. You must be enrolled in this course or be the owner to use the AI tutor." });
       }
 
       let session = await storage.getChatSession(id, userId);
@@ -2137,10 +2137,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Check if user is enrolled in the course
+      // Check if user is owner (professor or self-study room creator) or enrolled student
+      const isOwner = course.ownerId === userId;
       const isEnrolled = await storage.isEnrolled(userId, id);
-      if (!isEnrolled) {
-        return res.status(403).json({ message: "You must be enrolled in this course to generate flashcards" });
+      if (!isOwner && !isEnrolled) {
+        return res.status(403).json({ message: "You must be enrolled in this course or be the owner to generate flashcards" });
       }
 
       // Get all course modules for validation and filtering
@@ -2256,10 +2257,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Check if user is enrolled in the course
+      // Check if user is owner (professor or self-study room creator) or enrolled student
+      const isOwner = course.ownerId === userId;
       const isEnrolled = await storage.isEnrolled(userId, id);
-      if (!isEnrolled) {
-        return res.status(403).json({ message: "You must be enrolled in this course to view flashcards" });
+      if (!isOwner && !isEnrolled) {
+        return res.status(403).json({ message: "You must be enrolled in this course or be the owner to view flashcards" });
       }
 
       const flashcardSets = await storage.getFlashcardSets(userId, id);

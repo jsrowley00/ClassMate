@@ -4,7 +4,7 @@ import crypto from "crypto";
 import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { generatePracticeTest, generateTutorResponse, categorizeQuestionsIntoTopics, evaluateShortAnswer } from "./openai";
+import { generatePracticeTest, generateTutorResponse, categorizeQuestionsIntoTopics, evaluateShortAnswer, generateGlobalTutorResponse } from "./openai";
 import { insertCourseSchema, updateCourseSchema, insertCourseModuleSchema, insertCourseEnrollmentSchema, generateFlashcardsRequestSchema } from "@shared/schema";
 import mammoth from "mammoth";
 import officeParser from "officeparser";
@@ -1905,6 +1905,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error sending chat message:", error);
       res.status(500).json({ message: error.message || "Failed to send chat message. Please try again." });
+    }
+  });
+
+  // Global tutor routes - cross-course AI guidance
+  app.get('/api/global-tutor/chat', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get or create global chat session
+      let session = await storage.getGlobalChatSession(userId);
+      if (!session) {
+        session = await storage.createChatSession({
+          courseId: null, // Global session has no course
+          studentId: userId,
+          sessionType: "global",
+          title: "Global Study Assistant",
+        });
+      }
+
+      const messages = await storage.getChatMessages(session.id);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching global tutor messages:", error);
+      res.status(500).json({ message: "Failed to fetch chat messages" });
+    }
+  });
+
+  app.post('/api/global-tutor/chat', isAuthenticated, async (req: any, res) => {
+    try {
+      const { message } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!message || message.trim().length === 0) {
+        return res.status(400).json({ message: "Message cannot be empty" });
+      }
+
+      // Get or create global chat session
+      let session = await storage.getGlobalChatSession(userId);
+      if (!session) {
+        session = await storage.createChatSession({
+          courseId: null,
+          studentId: userId,
+          sessionType: "global",
+          title: "Global Study Assistant",
+        });
+      }
+
+      // Save user message
+      await storage.createChatMessage({
+        sessionId: session.id,
+        senderId: userId,
+        role: "user",
+        content: message.trim(),
+      });
+
+      // Fetch all enrolled courses
+      const enrolledCourses = await storage.getEnrolledCourses(userId);
+      
+      if (enrolledCourses.length === 0) {
+        const fallbackResponse = "You're not enrolled in any courses yet. Once you enroll in courses, I can help you prioritize which ones to focus on and track your mastery across all subjects!";
+        await storage.createChatMessage({
+          sessionId: session.id,
+          senderId: userId,
+          role: "assistant",
+          content: fallbackResponse,
+        });
+        return res.status(201).json({ success: true });
+      }
+
+      // Fetch cross-course mastery data
+      const crossCourseMastery = await Promise.all(
+        enrolledCourses.map(async (course) => {
+          const masteryRecords = await storage.getStudentObjectiveMastery(userId, course.id);
+          const learningObjectives = await storage.getLearningObjectivesByCourse(course.id);
+          
+          // Calculate course-level stats
+          const totalObjectives = masteryRecords.length;
+          const mastered = masteryRecords.filter(m => m.status === 'mastered').length;
+          const approaching = masteryRecords.filter(m => m.status === 'approaching').length;
+          const developing = masteryRecords.filter(m => m.status === 'developing').length;
+          
+          return {
+            courseId: course.id,
+            courseName: course.name,
+            courseDescription: course.description || '',
+            totalObjectives,
+            mastered,
+            approaching,
+            developing,
+            masteryRecords: masteryRecords.sort((a, b) => a.objectiveIndex - b.objectiveIndex),
+            learningObjectives,
+          };
+        })
+      );
+
+      // Get conversation history (excluding the message we just saved)
+      const previousMessages = await storage.getChatMessages(session.id);
+      const conversationHistory = previousMessages
+        .slice(0, -1)
+        .slice(-10)
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+
+      // Generate AI response with cross-course awareness
+      const aiResponse = await generateGlobalTutorResponse(
+        message.trim(),
+        conversationHistory,
+        crossCourseMastery
+      );
+
+      // Save AI message
+      await storage.createChatMessage({
+        sessionId: session.id,
+        senderId: userId,
+        role: "assistant",
+        content: aiResponse,
+      });
+
+      res.status(201).json({ success: true });
+    } catch (error: any) {
+      console.error("Error sending global tutor message:", error);
+      res.status(500).json({ message: error.message || "Failed to send message. Please try again." });
     }
   });
 

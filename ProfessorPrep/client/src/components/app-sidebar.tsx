@@ -1,4 +1,4 @@
-import { BookOpen, Home, Upload, LogOut, GraduationCap } from "lucide-react";
+import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -101,6 +101,11 @@ export function StudentSidebar() {
       title: "My Courses",
       url: "/",
       icon: BookOpen,
+    },
+    {
+      title: "Study Assistant",
+      url: "/global-tutor",
+      icon: Sparkles,
     },
   ];
 

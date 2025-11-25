@@ -752,3 +752,111 @@ Evaluate this student response using the rubric. Return JSON with:
     };
   }
 }
+
+// Global tutor that provides cross-course guidance and recommendations
+export async function generateGlobalTutorResponse(
+  userMessage: string,
+  conversationHistory: Array<{ role: string; content: string }>,
+  crossCourseMastery: Array<{
+    courseId: string;
+    courseName: string;
+    courseDescription: string;
+    totalObjectives: number;
+    mastered: number;
+    approaching: number;
+    developing: number;
+    masteryRecords: any[];
+    learningObjectives: any[];
+  }>
+): Promise<string> {
+  // Build cross-course summary
+  const crossCourseSummary = crossCourseMastery.map(course => {
+    const completionRate = course.totalObjectives > 0 
+      ? Math.round((course.mastered / course.totalObjectives) * 100) 
+      : 0;
+    
+    const priorityObjective = course.masteryRecords.find(m => m.status !== 'mastered');
+    
+    return {
+      name: course.courseName,
+      description: course.courseDescription,
+      stats: {
+        total: course.totalObjectives,
+        mastered: course.mastered,
+        approaching: course.approaching,
+        developing: course.developing,
+        completionRate: `${completionRate}%`,
+      },
+      priorityObjective: priorityObjective ? {
+        text: priorityObjective.objectiveText,
+        status: priorityObjective.status,
+        correctCount: priorityObjective.correctCount || 0,
+        formatsCount: priorityObjective.distinctFormatsCorrect?.length || 0,
+        hasRecentMajorMistake: priorityObjective.hasRecentMajorMistake,
+        reasoningQualitySatisfied: priorityObjective.reasoningQualitySatisfied,
+      } : null,
+    };
+  });
+
+  const systemPrompt = `You are a Global Study Assistant helping students manage their learning across multiple courses. Your role is to:
+
+1. PRIORITIZE: Help students identify which course needs attention most based on their mastery progress
+2. STRATEGIZE: Recommend which course to focus on next and explain why
+3. MOTIVATE: Celebrate wins and encourage balanced progress across all courses
+4. GUIDE: Provide specific, actionable next steps
+
+CROSS-COURSE MASTERY OVERVIEW:
+${crossCourseSummary.map(course => `
+COURSE: ${course.name}
+${course.description ? `Description: ${course.description}` : ''}
+Progress: ${course.stats.mastered}/${course.stats.total} objectives mastered (${course.stats.completionRate})
+Status Breakdown: ${course.stats.mastered} Mastered, ${course.stats.approaching} Approaching, ${course.stats.developing} Developing
+${course.priorityObjective ? `
+  Priority Objective: "${course.priorityObjective.text}"
+  Status: ${course.priorityObjective.status.toUpperCase()}
+  Progress: ${course.priorityObjective.correctCount}/3 demonstrations, ${course.priorityObjective.formatsCount}/2 formats
+  Blockers: ${[
+    course.priorityObjective.hasRecentMajorMistake ? 'recent conceptual mistakes' : null,
+    !course.priorityObjective.reasoningQualitySatisfied ? 'low reasoning quality' : null,
+    course.priorityObjective.correctCount < 3 ? `needs ${3 - course.priorityObjective.correctCount} more demonstrations` : null,
+    course.priorityObjective.formatsCount < 2 ? `needs ${2 - course.priorityObjective.formatsCount} more formats` : null,
+  ].filter(Boolean).join(', ') || 'none - keep practicing!'}
+` : '  No objectives tracked yet for this course'}
+`).join('\n')}
+
+RECOMMENDATION FRAMEWORK:
+1. Identify courses with the MOST "Developing" objectives (need most work)
+2. Consider which course has upcoming deadlines or exams (if mentioned by student)
+3. Recommend balanced progress - don't neglect courses with 0% completion
+4. For each course recommendation, be specific about:
+   - WHY this course needs attention (low completion %, many developing objectives, conceptual gaps)
+   - WHAT to focus on (the priority objective)
+   - HOW to improve (Practice Tests for demonstrations, review materials for conceptual mistakes, etc.)
+
+COMMUNICATION STYLE:
+- Keep responses short and actionable (2-4 paragraphs max)
+- Use specific course names and objective details
+- Provide clear next steps
+- Be encouraging but honest about what needs work
+- When students ask "what should I study next?", ALWAYS recommend a specific course and objective`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...conversationHistory.map(msg => ({
+          role: msg.role as "user" | "assistant",
+          content: msg.content
+        })),
+        { role: "user", content: userMessage }
+      ],
+      temperature: 0.7,
+    });
+
+    return response.choices[0].message.content?.trim() || "I'm having trouble generating a response. Please try again.";
+  } catch (error) {
+    console.error("Error generating global tutor response:", error);
+    return "I'm having trouble connecting to the AI service. Please try again in a moment.";
+  }
+}

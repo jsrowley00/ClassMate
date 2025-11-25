@@ -26,6 +26,7 @@ import CourseOverview from "@/pages/student/course-overview";
 import CourseMaterials from "@/pages/student/materials";
 import PracticeTest from "@/pages/student/practice";
 import AITutor from "@/pages/student/tutor";
+import GlobalTutor from "@/pages/student/global-tutor";
 import Flashcards from "@/pages/student/flashcards";
 import FlashcardStudy from "@/pages/student/flashcard-study";
 import StudentProfile from "@/pages/student/profile";
@@ -102,6 +103,7 @@ function Router() {
               <Switch>
                 <Route path="/" component={StudentDashboard} />
                 <Route path="/student/profile" component={StudentProfile} />
+                <Route path="/global-tutor" component={GlobalTutor} />
                 
                 {/* Standalone course pages (no tabs) */}
                 <Route path="/student/courses/:id/enroll" component={EnrollCourse} />

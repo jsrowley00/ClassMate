@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Plus, ArrowRight, FileText, Brain, Layers, MessageCircle } from "lucide-react";
+import { BookOpen, ArrowRight, FileText, Brain, Layers, MessageCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Course } from "@shared/schema";
@@ -31,11 +31,6 @@ export default function StudentDashboard() {
     enabled: isAuthenticated,
   });
 
-  const { data: availableCourses, isLoading: availableLoading } = useQuery<Course[]>({
-    queryKey: ["/api/courses/available"],
-    enabled: isAuthenticated,
-  });
-
   if (authLoading || !isAuthenticated) {
     return null;
   }
@@ -45,13 +40,9 @@ export default function StudentDashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">My Courses</h1>
         <p className="text-muted-foreground">
-          Access your enrolled courses and start studying
+          Access your courses and start studying
         </p>
       </div>
-
-      {/* Enrolled Courses */}
-      <div className="mb-12">
-        <h2 className="text-xl font-semibold mb-4">Enrolled Courses</h2>
         {enrolledLoading ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
@@ -144,67 +135,13 @@ export default function StudentDashboard() {
           <Card>
             <CardContent className="py-12 text-center">
               <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No enrolled courses yet</h3>
-              <p className="text-muted-foreground mb-6">
-                Browse available courses and enroll to start studying
+              <h3 className="text-lg font-semibold mb-2">No courses yet</h3>
+              <p className="text-muted-foreground">
+                Your professors will add you to courses when they're ready
               </p>
             </CardContent>
           </Card>
         )}
-      </div>
-
-      {/* Available Courses */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Available Courses</h2>
-        {availableLoading ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-6 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-full" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-10 w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : availableCourses && availableCourses.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {availableCourses.map((course) => (
-              <Card key={course.id} className="hover-elevate">
-                <CardHeader>
-                  <CardTitle className="text-lg">{course.name}</CardTitle>
-                  <CardDescription className="line-clamp-2">
-                    {course.description || "No description"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    size="sm"
-                    asChild
-                    className="w-full"
-                    data-testid={`button-enroll-${course.id}`}
-                  >
-                    <Link href={`/student/courses/${course.id}/enroll`}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Enroll Now
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No courses available at the moment</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
     </div>
   );
 }

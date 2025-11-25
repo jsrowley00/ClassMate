@@ -44,7 +44,7 @@ Preferred communication style: Simple, everyday language.
 
 4. **AI Tutor**: Socratic teaching method implementation providing short, focused responses. Can analyze practice test results to offer targeted guidance on struggling topics.
 
-5. **Analytics Processing**: Categorizes missed questions into broad study topics and maps them to specific learning objectives, providing professors insights into curriculum areas needing reinforcement.
+5. **Analytics Processing**: Categorizes missed questions intelligently based on available data. When learning objectives are present, uses `matchQuestionsToLearningObjectives` to map questions to specific objectives. Falls back to `categorizeQuestionsIntoTopics` for broad topic categorization when objectives are unavailable. API response includes `usesLearningObjectives` flag to indicate which method was used, enabling appropriate UI labeling.
 
 **Preview System**: Secure preview URL generation using token-based authentication. Tokens stored in-memory Map with expiration times, periodically cleaned up (60-second intervals). Supports DOCX and PPTX previews via Google Docs Viewer.
 

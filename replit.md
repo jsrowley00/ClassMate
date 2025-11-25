@@ -16,7 +16,7 @@ Preferred communication style: Simple, everyday language.
 
 **Design Philosophy**: Clean, educational interface inspired by Notion's clarity, Quizlet's study focus, and Khan Academy's accessibility. The design prioritizes information density and reading comfort with minimal distractions during study/test modes. Uses Inter font for optimal readability during extended study sessions, with a professional blue primary color scheme.
 
-**Component Architecture**: Role-specific experiences with separate sidebar navigation for professors (course management, material uploads, analytics) and students (course navigation, study tools). Course pages use a tab-based layout with a dedicated sidebar for navigating between Overview, Materials, Practice Tests, Flashcards, and AI Tutor sections.
+**Component Architecture**: Role-specific experiences with separate sidebar navigation for professors (course management, material uploads, analytics) and students (course navigation, study tools). Course pages use a tab-based layout with a dedicated sidebar for navigating between Overview, Materials, Practice Tests, Flashcards, and AI Tutor sections. Student dashboard displays only enrolled courses (professors add students to courses rather than students browsing and self-enrolling).
 
 **State Management**: TanStack Query handles all server state with configured defaults for no refetching on window focus and infinite stale time. Custom query functions handle 401 errors with configurable behavior (return null or throw).
 
@@ -50,7 +50,7 @@ Preferred communication style: Simple, everyday language.
 
 **Hierarchical Module System**: Supports parent-child relationships for organizing course materials. Modules can be reorganized, and files can be moved between modules. Queries include descendant module ID fetching to support multi-level hierarchies.
 
-**Learning Objectives Integration**: Learning objectives guide all AI-generated content. Automatic fetching from selected modules or all course modules. Module ID validation prevents cross-course objective access. Objective mastery tracking records student performance per objective.
+**Learning Objectives Integration**: Learning objectives guide all AI-generated content. Automatic fetching from selected modules or all course modules. Module ID validation prevents cross-course objective access. Objective mastery tracking uses waterfall progression: multi-objective questions update only the first non-mastered objective in course structure order, ensuring students master earlier concepts before progress moves to later ones.
 
 **Security Considerations**: Module ID validation ensures students can only access materials from courses they're enrolled in. Preview tokens expire and are cleaned periodically. Session cookies are HTTP-only, secure, and have 1-week max age.
 

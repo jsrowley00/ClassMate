@@ -904,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         objectivesMap.set(obj.moduleId, { moduleId: obj.moduleId, objectives: obj.objectives });
       });
 
-      // Track mastery for each question
+      // Track mastery for each question and log detailed attempts
       for (let idx = 0; idx < questions.length; idx++) {
         const question = questions[idx];
         const userAnswer = answers[idx];
@@ -916,6 +916,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             wasCorrect = true;
           }
         }
+
+        // Create detailed practice attempt record for each question
+        const questionId = `${test.id}-q${idx}`;
+        const questionFormat = question.type || test.testMode;
+        
+        await storage.createPracticeAttempt({
+          practiceTestId: test.id,
+          studentId: userId,
+          courseId: test.courseId,
+          questionId,
+          questionText: question.question || '',
+          questionFormat,
+          objectiveIndices: question.objectiveIndices || [],
+          moduleIds: test.selectedModuleIds || [],
+          studentAnswer: userAnswer || null,
+          correctAnswer: question.correctAnswer || '',
+          wasCorrect,
+        });
 
         // Update objective mastery if this question has objective tags
         if (question.objectiveIndices && Array.isArray(question.objectiveIndices) && test.selectedModuleIds) {

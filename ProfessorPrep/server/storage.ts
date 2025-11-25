@@ -11,6 +11,8 @@ import {
   flashcards,
   learningObjectives,
   objectiveMastery,
+  practiceAttempts,
+  shortAnswerEvaluations,
   type User,
   type UpsertUser,
   type Course,
@@ -35,6 +37,10 @@ import {
   type InsertLearningObjective,
   type ObjectiveMastery,
   type InsertObjectiveMastery,
+  type PracticeAttempt,
+  type InsertPracticeAttempt,
+  type ShortAnswerEvaluation,
+  type InsertShortAnswerEvaluation,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -115,6 +121,10 @@ export interface IStorage {
     wasCorrect: boolean
   ): Promise<void>;
   getStudentObjectiveMastery(studentId: string, courseId: string): Promise<ObjectiveMastery[]>;
+
+  // Practice attempt operations (for detailed mastery tracking)
+  createPracticeAttempt(attempt: InsertPracticeAttempt): Promise<PracticeAttempt>;
+  createShortAnswerEvaluation(evaluation: InsertShortAnswerEvaluation): Promise<ShortAnswerEvaluation>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -588,6 +598,23 @@ export class DatabaseStorage implements IStorage {
           eq(objectiveMastery.courseId, courseId)
         )
       );
+  }
+
+  // Practice attempt operations
+  async createPracticeAttempt(attemptData: InsertPracticeAttempt): Promise<PracticeAttempt> {
+    const [attempt] = await db
+      .insert(practiceAttempts)
+      .values(attemptData)
+      .returning();
+    return attempt;
+  }
+
+  async createShortAnswerEvaluation(evaluationData: InsertShortAnswerEvaluation): Promise<ShortAnswerEvaluation> {
+    const [evaluation] = await db
+      .insert(shortAnswerEvaluations)
+      .values(evaluationData)
+      .returning();
+    return evaluation;
   }
 }
 

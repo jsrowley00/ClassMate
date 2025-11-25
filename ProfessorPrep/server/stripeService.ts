@@ -18,7 +18,7 @@ export class StripeService {
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
-      mode: 'subscription',
+      mode: 'payment',
       success_url: successUrl,
       cancel_url: cancelUrl,
     });
@@ -111,10 +111,36 @@ export class StripeService {
 
   async updateUserStripeInfo(userId: string, stripeInfo: {
     stripeCustomerId?: string;
-    stripeSubscriptionId?: string;
+    stripePaymentId?: string;
   }) {
     const [user] = await db.update(users).set(stripeInfo).where(eq(users.id, userId)).returning();
     return user;
+  }
+
+  async activateStudentAccess(userId: string, paymentId: string) {
+    const expiresAt = new Date();
+    expiresAt.setMonth(expiresAt.getMonth() + 4);
+    
+    const [user] = await db.update(users).set({
+      stripePaymentId: paymentId,
+      subscriptionStatus: 'active',
+      subscriptionExpiresAt: expiresAt,
+      role: 'student',
+    }).where(eq(users.id, userId)).returning();
+    
+    return user;
+  }
+
+  async checkAccessValid(userId: string): Promise<boolean> {
+    const user = await this.getUser(userId);
+    if (!user) return false;
+    
+    if (user.role === 'professor') return true;
+    
+    if (user.subscriptionStatus !== 'active') return false;
+    if (!user.subscriptionExpiresAt) return false;
+    
+    return new Date(user.subscriptionExpiresAt) > new Date();
   }
 
   async getActiveSubscriptionForCustomer(customerId: string) {

@@ -34,13 +34,14 @@ export default function RoleSelection() {
   });
 
   const products: StripeProduct[] = productsData?.products || [];
-  const studentSubscription = products.find(p => 
+  const studentAccess = products.find(p => 
     p.name?.toLowerCase().includes("student") || 
+    (p as any).metadata?.type === "student_access" ||
     (p as any).metadata?.type === "student_subscription"
   );
-  const monthlyPrice = studentSubscription?.prices?.find(p => 
-    p.recurring?.interval === "month"
-  );
+  const oneTimePrice = studentAccess?.prices?.find(p => 
+    !p.recurring
+  ) || studentAccess?.prices?.[0];
 
   const setRoleMutation = useMutation({
     mutationFn: async (role: "professor" | "student") => {
@@ -100,8 +101,8 @@ export default function RoleSelection() {
   };
 
   const handleStartPayment = () => {
-    if (monthlyPrice) {
-      createCheckoutMutation.mutate(monthlyPrice.id);
+    if (oneTimePrice) {
+      createCheckoutMutation.mutate(oneTimePrice.id);
     }
   };
 
@@ -121,24 +122,24 @@ export default function RoleSelection() {
               <GraduationCap className="h-10 w-10 text-primary" />
               <span className="text-3xl font-bold">ClassMate</span>
             </div>
-            <h1 className="text-2xl font-bold mb-2">Complete Your Subscription</h1>
+            <h1 className="text-2xl font-bold mb-2">Get Student Access</h1>
             <p className="text-muted-foreground">
-              Get unlimited access to all ClassMate study tools
+              One-time purchase for 4 months of full access
             </p>
           </div>
 
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>Student Subscription</span>
-                {monthlyPrice && (
-                  <span className="text-primary">
-                    {formatPrice(monthlyPrice.unit_amount, monthlyPrice.currency)}/month
+                <span>4-Month Student Access</span>
+                {oneTimePrice && (
+                  <span className="text-primary text-2xl font-bold">
+                    {formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency)}
                   </span>
                 )}
               </CardTitle>
               <CardDescription>
-                Everything you need to excel in your studies
+                One-time purchase - access any class added during your 4-month period
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -161,6 +162,10 @@ export default function RoleSelection() {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-5 w-5 text-green-500" />
+                  <span>Access to all classes added during your period</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-green-500" />
                   <span>Progress tracking & mastery analytics</span>
                 </li>
               </ul>
@@ -169,7 +174,7 @@ export default function RoleSelection() {
                 className="w-full"
                 size="lg"
                 onClick={handleStartPayment}
-                disabled={createCheckoutMutation.isPending || !monthlyPrice}
+                disabled={createCheckoutMutation.isPending || !oneTimePrice}
               >
                 {createCheckoutMutation.isPending ? (
                   <>
@@ -179,7 +184,7 @@ export default function RoleSelection() {
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-4 w-4" />
-                    Subscribe Now
+                    Get Access - {oneTimePrice ? formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency) : '$40'}
                   </>
                 )}
               </Button>
@@ -198,7 +203,7 @@ export default function RoleSelection() {
           </Card>
 
           <p className="text-center text-xs text-muted-foreground mt-4">
-            Secure payment powered by Stripe. Cancel anytime.
+            Secure payment powered by Stripe. One-time payment, no recurring charges.
           </p>
         </div>
       </div>
@@ -285,15 +290,18 @@ export default function RoleSelection() {
               <div className="text-center mb-4">
                 {productsLoading ? (
                   <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                ) : monthlyPrice ? (
+                ) : oneTimePrice ? (
                   <>
                     <span className="text-2xl font-bold text-primary">
-                      {formatPrice(monthlyPrice.unit_amount, monthlyPrice.currency)}
+                      {formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency)}
                     </span>
-                    <span className="text-muted-foreground">/month</span>
+                    <p className="text-sm text-muted-foreground">one-time for 4 months</p>
                   </>
                 ) : (
-                  <span className="text-2xl font-bold text-primary">$12/month</span>
+                  <>
+                    <span className="text-2xl font-bold text-primary">$40</span>
+                    <p className="text-sm text-muted-foreground">one-time for 4 months</p>
+                  </>
                 )}
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
@@ -317,7 +325,7 @@ export default function RoleSelection() {
               >
                 {setRoleMutation.isPending && selectedRole === "student"
                   ? "Setting up..."
-                  : "Subscribe as Student"}
+                  : "Get Student Access"}
               </Button>
             </CardContent>
           </Card>

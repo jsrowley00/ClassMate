@@ -1,4 +1,8 @@
-import { getStripeSync } from './stripeClient';
+import { getStripeSync, getUncachableStripeClient } from './stripeClient';
+import { stripeService } from './stripeService';
+import { db } from './db';
+import { users } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string, uuid: string): Promise<void> {
@@ -13,5 +17,27 @@ export class WebhookHandlers {
 
     const sync = await getStripeSync();
     await sync.processWebhook(payload, signature, uuid);
+    
+    const stripe = await getUncachableStripeClient();
+    const event = stripe.webhooks.constructEvent(
+      payload,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET || ''
+    );
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as any;
+      
+      if (session.mode === 'payment' && session.payment_status === 'paid') {
+        const customerId = session.customer as string;
+        
+        const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId));
+        
+        if (user) {
+          console.log(`Activating student access for user ${user.id} after payment`);
+          await stripeService.activateStudentAccess(user.id, session.payment_intent as string);
+        }
+      }
+    }
   }
 }

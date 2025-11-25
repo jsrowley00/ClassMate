@@ -33,8 +33,9 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").notNull().default("student"), // "professor" or "student"
   stripeCustomerId: varchar("stripe_customer_id"),
-  stripeSubscriptionId: varchar("stripe_subscription_id"),
-  subscriptionStatus: varchar("subscription_status"), // "active", "canceled", "past_due", etc.
+  stripePaymentId: varchar("stripe_payment_id"), // One-time payment ID
+  subscriptionStatus: varchar("subscription_status"), // "active", "expired", etc.
+  subscriptionExpiresAt: timestamp("subscription_expires_at"), // When the 4-month access period ends
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

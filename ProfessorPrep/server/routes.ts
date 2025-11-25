@@ -84,6 +84,57 @@ async function autoGenerateLearningObjectives(moduleId: string): Promise<void> {
   }
 }
 
+// Middleware to check if student has valid active access (not expired)
+async function checkStudentAccess(req: any, res: any, next: any) {
+  try {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    // Professors always have access
+    if (user.role === 'professor') {
+      return next();
+    }
+
+    // Check if student has active access that hasn't expired
+    if (user.subscriptionStatus !== 'active') {
+      return res.status(403).json({ 
+        message: "Your access has not been activated. Please complete payment.",
+        accessExpired: false,
+        requiresPayment: true
+      });
+    }
+
+    if (!user.subscriptionExpiresAt) {
+      return res.status(403).json({ 
+        message: "Your access period is not set. Please contact support.",
+        accessExpired: true
+      });
+    }
+
+    const expiresAt = new Date(user.subscriptionExpiresAt);
+    if (expiresAt <= new Date()) {
+      return res.status(403).json({ 
+        message: "Your 4-month access period has expired. Please purchase again to continue.",
+        accessExpired: true,
+        expiresAt: user.subscriptionExpiresAt
+      });
+    }
+
+    // Access is valid
+    next();
+  } catch (error) {
+    console.error("Error checking student access:", error);
+    return res.status(500).json({ message: "Failed to verify access" });
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -851,7 +902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Practice test routes
-  app.post('/api/courses/:id/practice/generate', isAuthenticated, practiceTestLimiter, async (req: any, res) => {
+  app.post('/api/courses/:id/practice/generate', isAuthenticated, checkStudentAccess, practiceTestLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { testMode, questionCount: rawQuestionCount, moduleIds } = req.body;
@@ -960,7 +1011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/practice-tests/:id/submit', isAuthenticated, async (req: any, res) => {
+  app.post('/api/practice-tests/:id/submit', isAuthenticated, checkStudentAccess, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { answers } = req.body;
@@ -1738,7 +1789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Chat routes
-  app.get('/api/courses/:id/chat', isAuthenticated, async (req: any, res) => {
+  app.get('/api/courses/:id/chat', isAuthenticated, checkStudentAccess, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -1773,7 +1824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/courses/:id/chat', isAuthenticated, chatLimiter, async (req: any, res) => {
+  app.post('/api/courses/:id/chat', isAuthenticated, checkStudentAccess, chatLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { message } = req.body;
@@ -1965,7 +2016,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Global tutor routes - cross-course AI guidance
   
   // Create a new global chat session
-  app.post('/api/global-tutor/sessions/new', isAuthenticated, async (req: any, res) => {
+  app.post('/api/global-tutor/sessions/new', isAuthenticated, checkStudentAccess, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
@@ -1984,7 +2035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all global chat sessions for the user
-  app.get('/api/global-tutor/sessions', isAuthenticated, async (req: any, res) => {
+  app.get('/api/global-tutor/sessions', isAuthenticated, checkStudentAccess, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const sessions = await storage.getAllGlobalChatSessions(userId);
@@ -1995,7 +2046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/global-tutor/chat', isAuthenticated, async (req: any, res) => {
+  app.get('/api/global-tutor/chat', isAuthenticated, checkStudentAccess, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { sessionId } = req.query;
@@ -2018,7 +2069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/global-tutor/chat', isAuthenticated, chatLimiter, async (req: any, res) => {
+  app.post('/api/global-tutor/chat', isAuthenticated, checkStudentAccess, chatLimiter, async (req: any, res) => {
     try {
       const { message, sessionId } = req.body;
       const userId = req.user.claims.sub;
@@ -2129,7 +2180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Flashcard routes
   // Generate flashcards for a course
-  app.post('/api/courses/:id/flashcards/generate', isAuthenticated, flashcardLimiter, async (req: any, res) => {
+  app.post('/api/courses/:id/flashcards/generate', isAuthenticated, checkStudentAccess, flashcardLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -2259,7 +2310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all flashcard sets for a course
-  app.get('/api/courses/:id/flashcards', isAuthenticated, async (req: any, res) => {
+  app.get('/api/courses/:id/flashcards', isAuthenticated, checkStudentAccess, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
@@ -2285,7 +2336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get flashcards in a set
-  app.get('/api/flashcards/sets/:setId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/flashcards/sets/:setId', isAuthenticated, checkStudentAccess, async (req: any, res) => {
     try {
       const { setId } = req.params;
       const userId = req.user.claims.sub;
@@ -2585,7 +2636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer: customerId,
         payment_method_types: ['card'],
         line_items: [{ price: priceId, quantity: 1 }],
-        mode: 'subscription',
+        mode: 'payment',
         success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/checkout/cancel`,
         metadata: {
@@ -2600,7 +2651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify checkout session and activate subscription
+  // Verify checkout session and activate student access
   app.post('/api/stripe/verify-session', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2611,6 +2662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { getUncachableStripeClient } = await import('./stripeClient');
+      const { stripeService } = await import('./stripeService');
       const stripe = await getUncachableStripeClient();
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -2623,20 +2675,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Session does not belong to this user" });
       }
 
-      const subscriptionId = session.subscription as string;
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-
-      await storage.upsertUser({
-        id: userId,
-        stripeSubscriptionId: subscriptionId,
-        subscriptionStatus: subscription.status,
-        role: 'student',
-      });
+      const paymentId = session.payment_intent as string;
+      
+      const user = await stripeService.activateStudentAccess(userId, paymentId);
 
       res.json({ 
         success: true, 
-        subscriptionId,
-        status: subscription.status 
+        paymentId,
+        status: 'active',
+        expiresAt: user.subscriptionExpiresAt
       });
     } catch (error: any) {
       console.error("Error verifying session:", error);
@@ -2644,7 +2691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get current user's subscription status
+  // Get current user's access status
   app.get('/api/stripe/subscription', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2654,16 +2701,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      if (!user.stripeSubscriptionId) {
-        return res.json({ subscription: null });
+      if (!user.stripePaymentId) {
+        return res.json({ 
+          subscription: null,
+          status: null,
+          expiresAt: null,
+          isActive: false
+        });
       }
 
-      const { stripeService } = await import('./stripeService');
-      const subscription = await stripeService.getSubscription(user.stripeSubscriptionId);
+      const isActive = user.subscriptionStatus === 'active' && 
+        user.subscriptionExpiresAt && 
+        new Date(user.subscriptionExpiresAt) > new Date();
       
       res.json({ 
-        subscription,
-        status: user.subscriptionStatus 
+        paymentId: user.stripePaymentId,
+        status: user.subscriptionStatus,
+        expiresAt: user.subscriptionExpiresAt,
+        isActive
       });
     } catch (error) {
       console.error("Error fetching subscription:", error);

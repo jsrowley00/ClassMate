@@ -4,11 +4,14 @@ import { GraduationCap, BookOpen } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+const DEMO_ACCOUNT_IDS = ["49754447"];
+
 interface RoleSwitcherProps {
   currentRole: "professor" | "student";
+  userId?: string;
 }
 
-export function RoleSwitcher({ currentRole }: RoleSwitcherProps) {
+export function RoleSwitcher({ currentRole, userId }: RoleSwitcherProps) {
   const { toast } = useToast();
   const newRole = currentRole === "professor" ? "student" : "professor";
 
@@ -34,6 +37,10 @@ export function RoleSwitcher({ currentRole }: RoleSwitcherProps) {
       });
     },
   });
+
+  if (!userId || !DEMO_ACCOUNT_IDS.includes(userId)) {
+    return null;
+  }
 
   return (
     <Button

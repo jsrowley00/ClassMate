@@ -1436,6 +1436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           studentId: string;
         }>;
       }> = [];
+      let usesLearningObjectives = false;
 
       if (allMissedQuestions.length > 0) {
         // Try to get learning objectives for all modules in this course
@@ -1464,6 +1465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               learningObjectivesData,
               allMissedQuestions
             );
+            usesLearningObjectives = true;
           } catch (error) {
             console.error("Error matching questions to learning objectives, falling back to general categorization:", error);
             // Fall back to general categorization if learning objectives approach fails
@@ -1479,6 +1481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               combinedContent || "General course content",
               allMissedQuestions
             );
+            usesLearningObjectives = false;
           }
         } else {
           // No learning objectives available, use general categorization
@@ -1494,6 +1497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             combinedContent || "General course content",
             allMissedQuestions
           );
+          usesLearningObjectives = false;
         }
 
         // Convert to format expected by frontend
@@ -1513,7 +1517,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         students,
         recentActivity,
-        topicsByMisses, // New: Topics grouped with their missed questions
+        topicsByMisses,
+        usesLearningObjectives, // Indicates whether topics represent learning objectives or generic categories
       });
     } catch (error: any) {
       console.error("Error fetching practice test analytics:", error);

@@ -45,6 +45,55 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
+function LearningObjectiveItem({ topicData, idx }: { topicData: any; idx: number }) {
+  const [isObjectiveExpanded, setIsObjectiveExpanded] = useState(false);
+  
+  return (
+    <div
+      className="border rounded-md"
+      data-testid={`analytics-topic-${idx}`}
+    >
+      <Collapsible open={isObjectiveExpanded} onOpenChange={setIsObjectiveExpanded}>
+        <CollapsibleTrigger asChild>
+          <div className="p-3 hover-elevate cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-1">
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isObjectiveExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                <div className="flex-1">
+                  <div className="font-medium">{topicData.category}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {topicData.description}
+                  </div>
+                </div>
+              </div>
+              <Badge variant="destructive">
+                {topicData.totalMisses} {topicData.totalMisses === 1 ? 'miss' : 'misses'}
+              </Badge>
+            </div>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-3 pb-3 space-y-2 ml-6">
+            {topicData.questions.map((missed: any, qIdx: number) => (
+              <div
+                key={qIdx}
+                className="p-3 border rounded-md text-sm bg-muted/30"
+                data-testid={`missed-question-${idx}-${qIdx}`}
+              >
+                <div className="font-medium mb-2">{missed.questionText}</div>
+                <div className="text-xs text-muted-foreground">
+                  Missed by: <span className="font-medium">{missed.studentName}</span>
+                  {missed.studentEmail && ` (${missed.studentEmail})`}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -796,16 +845,22 @@ export default function CourseDetail() {
                 </div>
               </div>
 
-              {/* Study Topics - Grouped by AI-Categorized Broad Topics */}
+              {/* Learning Objectives or Study Topics - Students' Struggling Areas */}
               {(analytics as any).topicsByMisses && (analytics as any).topicsByMisses.length > 0 && (
                 <Collapsible open={isTopicsExpanded} onOpenChange={setIsTopicsExpanded}>
                   <CollapsibleTrigger asChild>
                     <div className="flex items-center gap-2 mb-3 cursor-pointer hover-elevate p-2 rounded-md" data-testid="toggle-topics">
                       <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isTopicsExpanded ? 'rotate-0' : '-rotate-90'}`} />
                       <TrendingDown className="h-4 w-4 text-destructive" />
-                      <h3 className="font-semibold">Study Topics Students Are Struggling With</h3>
+                      <h3 className="font-semibold">
+                        {(analytics as any).usesLearningObjectives
+                          ? 'Learning Objectives Students Are Struggling With'
+                          : 'Study Topics Students Are Struggling With'}
+                      </h3>
                       <Badge variant="destructive" className="ml-auto">
-                        {(analytics as any).topicsByMisses.length} {(analytics as any).topicsByMisses.length === 1 ? 'category' : 'categories'}
+                        {(analytics as any).topicsByMisses.length} {(analytics as any).topicsByMisses.length === 1 
+                          ? ((analytics as any).usesLearningObjectives ? 'objective' : 'topic')
+                          : ((analytics as any).usesLearningObjectives ? 'objectives' : 'topics')}
                       </Badge>
                     </div>
                   </CollapsibleTrigger>
@@ -814,59 +869,11 @@ export default function CourseDetail() {
                     {(analytics as any).topicsByMisses
                       .slice(0, 15)
                       .map((topicData: any, idx: number) => (
-                        <Dialog key={idx}>
-                          <DialogTrigger asChild>
-                            <div
-                              className="p-3 border rounded-md hover-elevate cursor-pointer"
-                              data-testid={`analytics-topic-${idx}`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="font-medium">{topicData.category}</div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {topicData.description || `${topicData.totalMisses} question${topicData.totalMisses !== 1 ? 's' : ''} missed in this category`}
-                                  </div>
-                                </div>
-                                <Badge variant="destructive">
-                                  {topicData.totalMisses} {topicData.totalMisses === 1 ? 'miss' : 'misses'}
-                                </Badge>
-                              </div>
-                            </div>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>{topicData.category}</DialogTitle>
-                              <DialogDescription>
-                                {topicData.description || "Questions students missed in this study topic"}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="p-3 border rounded-md">
-                                <div className="text-sm text-muted-foreground mb-1">Questions Missed</div>
-                                <div className="text-2xl font-bold text-destructive">{topicData.totalMisses}</div>
-                              </div>
-                              
-                              <div>
-                                <h4 className="font-semibold mb-3">Missed Questions in This Category</h4>
-                                <div className="space-y-3">
-                                  {topicData.questions.map((missed: any, qIdx: number) => (
-                                    <div
-                                      key={qIdx}
-                                      className="p-3 border rounded-md text-sm"
-                                      data-testid={`missed-question-${idx}-${qIdx}`}
-                                    >
-                                      <div className="font-medium mb-2">{missed.questionText}</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        Missed by: <span className="font-medium">{missed.studentName}</span>
-                                        {missed.studentEmail && ` (${missed.studentEmail})`}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                        <LearningObjectiveItem
+                          key={idx}
+                          topicData={topicData}
+                          idx={idx}
+                        />
                       ))}
                     </div>
                   </CollapsibleContent>

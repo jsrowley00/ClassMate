@@ -4,6 +4,8 @@
 
 ClassMate is an AI-powered educational platform that transforms traditional course materials into interactive learning experiences. Professors upload study materials (PDFs, Word docs, PowerPoint, images, videos) which are then processed to generate AI-enhanced study tools. Students can access AI-generated practice tests, flashcards, and personalized tutoring based on their professor's actual course content. The platform features hierarchical course organization through modules, automatic learning objective generation, and intelligent question randomization to ensure varied, effective study sessions.
 
+**Self-Study Rooms**: Students whose professors don't use ClassMate can create their own private study spaces to upload materials and access all AI study tools. Self-study rooms use a dual-mode course system where `courseType="self-study"` distinguishes personal study spaces from professor-led courses. Students can create unlimited self-study rooms (planned $12/month subscription model for future monetization).
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -16,7 +18,7 @@ Preferred communication style: Simple, everyday language.
 
 **Design Philosophy**: Clean, educational interface inspired by Notion's clarity, Quizlet's study focus, and Khan Academy's accessibility. The design prioritizes information density and reading comfort with minimal distractions during study/test modes. Uses Inter font for optimal readability during extended study sessions, with a professional blue primary color scheme.
 
-**Component Architecture**: Role-specific experiences with separate sidebar navigation for professors (course management, material uploads, analytics) and students (course navigation, study tools). Student sidebar features a collapsible "Study Assistant" menu with quick access to global tutor ("New Chat") and all course-specific AI tutors. Course pages use a tab-based layout with a dedicated sidebar for navigating between Overview, Materials, Practice Tests, Flashcards, and AI Tutor sections. Student dashboard displays only enrolled courses (professors add students to courses rather than students browsing and self-enrolling).
+**Component Architecture**: Role-specific experiences with separate sidebar navigation for professors (course management, material uploads, analytics) and students (course navigation, study tools). Student sidebar features a collapsible "Study Assistant" menu with quick access to global tutor ("New Chat") and all course-specific AI tutors. Course pages use a tab-based layout with a dedicated sidebar for navigating between Overview, Materials, Practice Tests, Flashcards, and AI Tutor sections. Student dashboard displays two sections: "My Courses" (professor-led courses where students are enrolled) and "My Self-Study Rooms" (personal study spaces created by students) with a "Create Self-Study Room" button for easy room creation.
 
 **State Management**: TanStack Query handles all server state with configured defaults for no refetching on window focus and infinite stale time. Custom query functions handle 401 errors with configurable behavior (return null or throw).
 
@@ -31,6 +33,11 @@ Preferred communication style: Simple, everyday language.
 **File Processing**: Multer middleware handles file uploads with 10MB limit and memory storage. Text extraction supports PDF, DOCX, and PPTX formats using `mammoth` and `officeparser` libraries. Temporary files created with `tmp` library for processing, then cleaned up after extraction.
 
 **Authentication & Sessions**: Replit Auth implements OpenID Connect authentication with passport.js. Session management uses `connect-pg-simple` for PostgreSQL-backed sessions with 1-week TTL. Role-based access control distinguishes professors from students, with dedicated endpoints for role selection and switching.
+
+**Permissions Architecture**: The platform uses a dual ownership model to support both professor-led courses and self-study rooms:
+- **ownerId**: Identifies the course owner (professor or self-study room creator). Used for course management permissions (CRUD operations on courses, modules, materials, learning objectives). Self-study rooms set `ownerId` to the student who created them with `professorId` as nullable.
+- **professorId**: Specifically identifies professor-led courses. Used exclusively for professor-only features like student enrollment management and analytics dashboards. Self-study rooms have `null` professorId since students don't manage enrollments.
+- **Access Control**: All student-facing AI features (materials access, practice tests, flashcards, AI tutor) check `ownerId OR isEnrolled`, allowing both self-study room owners and enrolled students to access course content. Professor-only features (enrollment management, analytics) check `professorId` only to prevent students from accessing institutional data.
 
 ### AI Integration Architecture
 

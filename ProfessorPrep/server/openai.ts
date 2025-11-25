@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { z } from "zod";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 // This is using OpenAI's API directly with your own API key.
@@ -560,5 +561,102 @@ Generate 4-6 learning objectives for this module.`;
   } catch (error) {
     console.error("Error generating learning objectives:", error);
     throw new Error("Failed to generate learning objectives");
+  }
+}
+
+export interface ShortAnswerEvaluation {
+  reasoningQualityScore: number;
+  hasMajorMistake: boolean;
+  evaluationNotes: string;
+}
+
+const shortAnswerEvaluationSchema = z.object({
+  reasoningQualityScore: z.number().int().min(0).max(2),
+  hasMajorMistake: z.boolean(),
+  evaluationNotes: z.string(),
+});
+
+export async function evaluateShortAnswer(
+  questionText: string,
+  correctAnswer: string,
+  studentAnswer: string
+): Promise<ShortAnswerEvaluation> {
+  if (!studentAnswer || studentAnswer.trim().length === 0) {
+    return {
+      reasoningQualityScore: 0,
+      hasMajorMistake: true,
+      evaluationNotes: "No answer provided."
+    };
+  }
+
+  if (studentAnswer.trim().length < 10) {
+    return {
+      reasoningQualityScore: 0,
+      hasMajorMistake: true,
+      evaluationNotes: "Answer is too brief to demonstrate understanding."
+    };
+  }
+
+  const systemPrompt = `You are an expert educator evaluating student short-answer responses. Your goal is to determine whether the student demonstrates genuine understanding or is merely memorizing/guessing.
+
+REASONING QUALITY SCORING (0-2 scale):
+- Score 0 (Poor): Answer shows memorization without understanding, uses vague language, only matches keywords, is off-topic, or contains major conceptual errors
+- Score 1 (Partial): Answer shows incomplete understanding with some correct elements but significant gaps, partial explanations, or minor misconceptions
+- Score 2 (Strong): Answer demonstrates clear understanding in student's own words, provides complete explanation, connects concepts correctly, and shows genuine comprehension
+
+MAJOR MISTAKE DETECTION:
+- Flag as true if the answer contains fundamental conceptual errors, contradicts core principles, or shows complete misunderstanding
+- Flag as false if the answer is generally on track, even if incomplete
+
+EVALUATION NOTES:
+- Provide 2-4 sentences explaining your score
+- Reference specific strengths or weaknesses in reasoning
+- Note whether answer shows understanding vs. memorization
+
+Respond with valid JSON only.`;
+
+  const userPrompt = `Question: ${questionText}
+
+Expected Answer: ${correctAnswer}
+
+Student's Answer: ${studentAnswer}
+
+Evaluate this student response using the rubric. Return JSON with:
+- reasoningQualityScore: number (0, 1, or 2)
+- hasMajorMistake: boolean
+- evaluationNotes: string (2-4 sentences)`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+    });
+
+    const content = response.choices[0].message.content?.trim() || '{}';
+    const parsed = JSON.parse(content);
+
+    const validation = shortAnswerEvaluationSchema.safeParse(parsed);
+    if (!validation.success) {
+      console.error('Invalid evaluation response from OpenAI:', validation.error);
+      return {
+        reasoningQualityScore: 0,
+        hasMajorMistake: true,
+        evaluationNotes: "Evaluation failed due to invalid response format."
+      };
+    }
+
+    return validation.data;
+  } catch (error) {
+    console.error("Error evaluating short answer:", error);
+    return {
+      reasoningQualityScore: 0,
+      hasMajorMistake: true,
+      evaluationNotes: "Evaluation failed due to technical error."
+    };
   }
 }

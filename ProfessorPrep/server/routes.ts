@@ -4,7 +4,7 @@ import crypto from "crypto";
 import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { generatePracticeTest, generateTutorResponse, categorizeQuestionsIntoTopics } from "./openai";
+import { generatePracticeTest, generateTutorResponse, categorizeQuestionsIntoTopics, evaluateShortAnswer } from "./openai";
 import { insertCourseSchema, insertCourseModuleSchema, insertCourseEnrollmentSchema, generateFlashcardsRequestSchema } from "@shared/schema";
 import mammoth from "mammoth";
 import officeParser from "officeparser";
@@ -907,11 +907,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Track mastery for each question and log detailed attempts
       for (let idx = 0; idx < questions.length; idx++) {
         const question = questions[idx];
-        const userAnswer = answers[idx];
+        const rawAnswer = answers[idx];
+        const normalizedAnswer = (rawAnswer === null || rawAnswer === undefined) ? '' : String(rawAnswer);
         let wasCorrect = false;
 
-        if (userAnswer && question.correctAnswer) {
-          if (userAnswer.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim()) {
+        if (normalizedAnswer && question.correctAnswer) {
+          if (normalizedAnswer.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim()) {
             correctCount++;
             wasCorrect = true;
           }
@@ -921,7 +922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const questionId = `${test.id}-q${idx}`;
         const questionFormat = question.type || test.testMode;
         
-        await storage.createPracticeAttempt({
+        const attempt = await storage.createPracticeAttempt({
           practiceTestId: test.id,
           studentId: userId,
           courseId: test.courseId,
@@ -930,10 +931,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           questionFormat,
           objectiveIndices: question.objectiveIndices || [],
           moduleIds: test.selectedModuleIds || [],
-          studentAnswer: userAnswer || null,
+          studentAnswer: normalizedAnswer,
           correctAnswer: question.correctAnswer || '',
           wasCorrect,
         });
+
+        // If this is a short answer question, evaluate reasoning quality
+        if (questionFormat === 'short_answer') {
+          try {
+            const evaluation = await evaluateShortAnswer(
+              question.question || '',
+              question.correctAnswer || '',
+              normalizedAnswer
+            );
+            
+            await storage.createShortAnswerEvaluation({
+              attemptId: attempt.id,
+              reasoningQualityScore: evaluation.reasoningQualityScore,
+              hasMajorMistake: evaluation.hasMajorMistake,
+              evaluationNotes: evaluation.evaluationNotes,
+            });
+          } catch (evalError) {
+            console.error('Error evaluating short answer:', evalError);
+          }
+        }
 
         // Update objective mastery if this question has objective tags
         if (question.objectiveIndices && Array.isArray(question.objectiveIndices) && test.selectedModuleIds) {

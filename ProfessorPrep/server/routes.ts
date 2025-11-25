@@ -1909,19 +1909,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Global tutor routes - cross-course AI guidance
+  
+  // Create a new global chat session
+  app.post('/api/global-tutor/sessions/new', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const session = await storage.createChatSession({
+        courseId: null,
+        studentId: userId,
+        sessionType: "global",
+        title: `Chat ${new Date().toLocaleDateString()}`,
+      });
+
+      res.status(201).json(session);
+    } catch (error) {
+      console.error("Error creating global chat session:", error);
+      res.status(500).json({ message: "Failed to create chat session" });
+    }
+  });
+
+  // Get all global chat sessions for the user
+  app.get('/api/global-tutor/sessions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessions = await storage.getAllGlobalChatSessions(userId);
+      res.json(sessions);
+    } catch (error) {
+      console.error("Error fetching global chat sessions:", error);
+      res.status(500).json({ message: "Failed to fetch chat sessions" });
+    }
+  });
+
   app.get('/api/global-tutor/chat', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const { sessionId } = req.query;
 
-      // Get or create global chat session
-      let session = await storage.getGlobalChatSession(userId);
-      if (!session) {
-        session = await storage.createChatSession({
-          courseId: null, // Global session has no course
-          studentId: userId,
-          sessionType: "global",
-          title: "Global Study Assistant",
-        });
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      // Verify session belongs to user and is global
+      const session = await storage.getChatSessionById(sessionId as string);
+      if (!session || session.studentId !== userId || session.sessionType !== "global") {
+        return res.status(404).json({ message: "Session not found" });
       }
 
       const messages = await storage.getChatMessages(session.id);
@@ -1934,22 +1966,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/global-tutor/chat', isAuthenticated, async (req: any, res) => {
     try {
-      const { message } = req.body;
+      const { message, sessionId } = req.body;
       const userId = req.user.claims.sub;
 
       if (!message || message.trim().length === 0) {
         return res.status(400).json({ message: "Message cannot be empty" });
       }
 
-      // Get or create global chat session
-      let session = await storage.getGlobalChatSession(userId);
-      if (!session) {
-        session = await storage.createChatSession({
-          courseId: null,
-          studentId: userId,
-          sessionType: "global",
-          title: "Global Study Assistant",
-        });
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      // Verify session belongs to user and is global
+      const session = await storage.getChatSessionById(sessionId);
+      if (!session || session.studentId !== userId || session.sessionType !== "global") {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      // Get existing messages to check if this is the first user message
+      const existingMessages = await storage.getChatMessages(session.id);
+      const isFirstMessage = existingMessages.filter(m => m.role === "user").length === 0;
+
+      // If first message, update session title with message preview
+      if (isFirstMessage) {
+        const titlePreview = message.trim().slice(0, 50) + (message.trim().length > 50 ? "..." : "");
+        await storage.updateChatSession(session.id, { title: titlePreview });
       }
 
       // Save user message

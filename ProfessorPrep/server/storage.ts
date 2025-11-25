@@ -421,6 +421,36 @@ export class DatabaseStorage implements IStorage {
     return session;
   }
 
+  async getAllGlobalChatSessions(studentId: string): Promise<ChatSession[]> {
+    return await db
+      .select()
+      .from(chatSessions)
+      .where(
+        and(
+          eq(chatSessions.studentId, studentId),
+          eq(chatSessions.sessionType, "global")
+        )
+      )
+      .orderBy(desc(chatSessions.updatedAt));
+  }
+
+  async getChatSessionById(sessionId: string): Promise<ChatSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(chatSessions)
+      .where(eq(chatSessions.id, sessionId));
+    return session;
+  }
+
+  async updateChatSession(sessionId: string, data: Partial<ChatSession>): Promise<ChatSession> {
+    const [session] = await db
+      .update(chatSessions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(chatSessions.id, sessionId))
+      .returning();
+    return session;
+  }
+
   async createChatSession(sessionData: InsertChatSession): Promise<ChatSession> {
     const [session] = await db.insert(chatSessions).values(sessionData).returning();
     return session;

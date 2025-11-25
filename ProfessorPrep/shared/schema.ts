@@ -153,6 +153,38 @@ export const objectiveMastery = pgTable("objective_mastery", {
   totalCount: integer("total_count").notNull().default(0), // Total times encountered
   lastEncountered: timestamp("last_encountered").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  // New fields for rigorous mastery tracking
+  status: varchar("status").notNull().default("developing"), // "developing", "approaching", "mastered"
+  streakCount: integer("streak_count").notNull().default(0), // Current streak of correct answers
+  distinctFormatsCorrect: text("distinct_formats_correct").array().default(sql`ARRAY[]::text[]`), // Array of question formats answered correctly
+  lastStatusChange: timestamp("last_status_change").defaultNow(),
+});
+
+// Practice attempts table - logs each individual question attempt for detailed tracking
+export const practiceAttempts = pgTable("practice_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  practiceTestId: varchar("practice_test_id").notNull().references(() => practiceTests.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  questionId: varchar("question_id").notNull(), // Unique identifier for the question within the test
+  questionText: text("question_text").notNull(), // The actual question asked
+  questionFormat: varchar("question_format").notNull(), // "multiple_choice", "short_answer", "fill_blank"
+  objectiveIndices: integer("objective_indices").array().notNull(), // Array of objective indices this question assesses
+  moduleIds: text("module_ids").array().notNull(), // Module IDs relevant to this question
+  studentAnswer: text("student_answer"), // The student's actual answer (text or selected option)
+  correctAnswer: text("correct_answer"), // The correct answer for comparison
+  wasCorrect: boolean("was_correct").notNull(), // Whether the answer was correct
+  attemptedAt: timestamp("attempted_at").defaultNow(),
+});
+
+// Short answer evaluations table - stores AI-scored reasoning quality for short answer questions
+export const shortAnswerEvaluations = pgTable("short_answer_evaluations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  attemptId: varchar("attempt_id").notNull().references(() => practiceAttempts.id, { onDelete: 'cascade' }),
+  reasoningQualityScore: integer("reasoning_quality_score").notNull(), // 0-2 scale (0=poor, 1=partial, 2=strong)
+  hasMajorMistake: boolean("has_major_mistake").notNull().default(false), // Whether response contains conceptual errors
+  evaluationNotes: text("evaluation_notes"), // Brief AI feedback on reasoning quality
+  evaluatedAt: timestamp("evaluated_at").defaultNow(),
 });
 
 // Relations (must be defined after all tables)
@@ -289,6 +321,29 @@ export const objectiveMasteryRelations = relations(objectiveMastery, ({ one }) =
   }),
 }));
 
+export const practiceAttemptsRelations = relations(practiceAttempts, ({ one, many }) => ({
+  practiceTest: one(practiceTests, {
+    fields: [practiceAttempts.practiceTestId],
+    references: [practiceTests.id],
+  }),
+  student: one(users, {
+    fields: [practiceAttempts.studentId],
+    references: [users.id],
+  }),
+  course: one(courses, {
+    fields: [practiceAttempts.courseId],
+    references: [courses.id],
+  }),
+  evaluation: one(shortAnswerEvaluations),
+}));
+
+export const shortAnswerEvaluationsRelations = relations(shortAnswerEvaluations, ({ one }) => ({
+  attempt: one(practiceAttempts, {
+    fields: [shortAnswerEvaluations.attemptId],
+    references: [practiceAttempts.id],
+  }),
+}));
+
 // Zod schemas and types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -377,6 +432,21 @@ export const insertObjectiveMasterySchema = createInsertSchema(objectiveMastery)
   id: true,
   lastEncountered: true,
   updatedAt: true,
+  lastStatusChange: true,
 });
 export type InsertObjectiveMastery = z.infer<typeof insertObjectiveMasterySchema>;
 export type ObjectiveMastery = typeof objectiveMastery.$inferSelect;
+
+export const insertPracticeAttemptSchema = createInsertSchema(practiceAttempts).omit({
+  id: true,
+  attemptedAt: true,
+});
+export type InsertPracticeAttempt = z.infer<typeof insertPracticeAttemptSchema>;
+export type PracticeAttempt = typeof practiceAttempts.$inferSelect;
+
+export const insertShortAnswerEvaluationSchema = createInsertSchema(shortAnswerEvaluations).omit({
+  id: true,
+  evaluatedAt: true,
+});
+export type InsertShortAnswerEvaluation = z.infer<typeof insertShortAnswerEvaluationSchema>;
+export type ShortAnswerEvaluation = typeof shortAnswerEvaluations.$inferSelect;

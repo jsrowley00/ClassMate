@@ -1,4 +1,4 @@
-import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles } from "lucide-react";
+import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles, ChevronDown, MessageSquarePlus, Bot } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -9,12 +9,18 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import type { Course } from "@shared/schema";
 
 export function ProfessorSidebar() {
   const [location] = useLocation();
@@ -94,24 +100,20 @@ export function ProfessorSidebar() {
 
 export function StudentSidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
-  const menuItems = [
-    {
-      title: "My Courses",
-      url: "/",
-      icon: BookOpen,
-    },
-    {
-      title: "Study Assistant",
-      url: "/global-tutor",
-      icon: Sparkles,
-    },
-  ];
+  // Fetch enrolled courses for the Study Assistant submenu
+  const { data: courses = [] } = useQuery<Course[]>({
+    queryKey: ["/api/student/enrolled-courses"],
+    enabled: isAuthenticated,
+  });
 
   const initials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`
     : user?.email?.[0]?.toUpperCase() || "S";
+
+  // Check if we're on any global-tutor or course tutor page
+  const isOnStudyAssistant = location.startsWith("/global-tutor") || (location.includes("/courses/") && location.endsWith("/tutor"));
 
   return (
     <Sidebar>
@@ -126,16 +128,53 @@ export function StudentSidebar() {
           <SidebarGroupLabel>Student Portal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild data-active={location === item.url}>
-                    <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
+              {/* My Courses */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild data-active={location === "/"}>
+                  <Link href="/">
+                    <BookOpen />
+                    <span>My Courses</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Study Assistant with collapsible submenu */}
+              <Collapsible defaultOpen={isOnStudyAssistant} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton data-active={isOnStudyAssistant}>
+                      <Sparkles />
+                      <span>Study Assistant</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {/* New Chat option */}
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <Link href="/global-tutor">
+                            <MessageSquarePlus className="h-4 w-4" />
+                            <span>New Chat</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      {/* Course-specific tutors */}
+                      {courses.map((course) => (
+                        <SidebarMenuSubItem key={course.id}>
+                          <SidebarMenuSubButton asChild>
+                            <Link href={`/student/courses/${course.id}/tutor`}>
+                              <Bot className="h-4 w-4" />
+                              <span className="truncate">{course.name}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
                 </SidebarMenuItem>
-              ))}
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

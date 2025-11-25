@@ -240,33 +240,6 @@ export function StudentSidebar() {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
-                      {/* New Chat option */}
-                      <SidebarMenuSubItem>
-                        <SidebarMenuSubButton asChild>
-                          <Link href="/global-tutor">
-                            <MessageSquarePlus className="h-4 w-4" />
-                            <span>New Chat</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-
-                      {/* Existing global chat sessions */}
-                      {globalSessions.map((session) => (
-                        <SidebarMenuSubItem key={session.id}>
-                          <SidebarMenuSubButton asChild data-active={location === `/global-tutor/${session.id}`}>
-                            <Link href={`/global-tutor/${session.id}`}>
-                              <MessageSquare className="h-4 w-4" />
-                              <span className="truncate">{session.title || "Untitled Chat"}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-
-                      {/* Separator if there are global sessions and courses/rooms */}
-                      {globalSessions.length > 0 && (enrolledCourses.length > 0 || selfStudyRooms.length > 0) && (
-                        <div className="my-2 border-t" />
-                      )}
-
                       {/* Class AI Tutors - pinned under course name */}
                       {enrolledCourses.map((course) => (
                         <SidebarMenuSubItem key={`tutor-${course.id}`}>
@@ -291,6 +264,33 @@ export function StudentSidebar() {
                             <Link href={`/student/courses/${room.id}/tutor`}>
                               <Bot className="h-4 w-4" />
                               <span className="truncate">{room.name}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+
+                      {/* Separator before global chats */}
+                      {(enrolledCourses.length > 0 || selfStudyRooms.length > 0) && (
+                        <div className="my-2 border-t" />
+                      )}
+
+                      {/* New Chat option */}
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild>
+                          <Link href="/global-tutor">
+                            <MessageSquarePlus className="h-4 w-4" />
+                            <span>New Chat</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+
+                      {/* Existing global chat sessions */}
+                      {globalSessions.map((session) => (
+                        <SidebarMenuSubItem key={session.id}>
+                          <SidebarMenuSubButton asChild data-active={location === `/global-tutor/${session.id}`}>
+                            <Link href={`/global-tutor/${session.id}`}>
+                              <MessageSquare className="h-4 w-4" />
+                              <span className="truncate">{session.title || "Untitled Chat"}</span>
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

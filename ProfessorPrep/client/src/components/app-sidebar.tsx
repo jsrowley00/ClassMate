@@ -180,30 +180,14 @@ export function StudentSidebar() {
                         </SidebarMenuSubItem>
                       ) : (
                         enrolledCourses.map((course) => (
-                          <Collapsible key={course.id} defaultOpen={location.includes(course.id)} className="group/course">
-                            <SidebarMenuSubItem>
-                              <CollapsibleTrigger asChild>
-                                <SidebarMenuSubButton className="cursor-pointer" data-active={location === `/student/courses/${course.id}`}>
-                                  <BookOpen className="h-4 w-4" />
-                                  <span className="truncate flex-1">{course.name}</span>
-                                  <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]/course:rotate-180" />
-                                </SidebarMenuSubButton>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent className="pl-4">
-                                <SidebarMenuSubButton asChild data-active={location === `/student/courses/${course.id}`}>
-                                  <Link href={`/student/courses/${course.id}`}>
-                                    <span className="text-xs">Overview</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                                <SidebarMenuSubButton asChild data-active={location === `/student/courses/${course.id}/tutor`}>
-                                  <Link href={`/student/courses/${course.id}/tutor`}>
-                                    <Bot className="h-3 w-3" />
-                                    <span className="text-xs">AI Tutor</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </CollapsibleContent>
-                            </SidebarMenuSubItem>
-                          </Collapsible>
+                          <SidebarMenuSubItem key={course.id}>
+                            <SidebarMenuSubButton asChild data-active={location.includes(`/courses/${course.id}`)}>
+                              <Link href={`/student/courses/${course.id}`}>
+                                <BookOpen className="h-4 w-4" />
+                                <span className="truncate">{course.name}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
                         ))
                       )}
                     </SidebarMenuSub>
@@ -229,30 +213,14 @@ export function StudentSidebar() {
                         </SidebarMenuSubItem>
                       ) : (
                         selfStudyRooms.map((room) => (
-                          <Collapsible key={room.id} defaultOpen={location.includes(room.id)} className="group/room">
-                            <SidebarMenuSubItem>
-                              <CollapsibleTrigger asChild>
-                                <SidebarMenuSubButton className="cursor-pointer" data-active={location === `/student/courses/${room.id}`}>
-                                  <FolderOpen className="h-4 w-4" />
-                                  <span className="truncate flex-1">{room.name}</span>
-                                  <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]/room:rotate-180" />
-                                </SidebarMenuSubButton>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent className="pl-4">
-                                <SidebarMenuSubButton asChild data-active={location === `/student/courses/${room.id}`}>
-                                  <Link href={`/student/courses/${room.id}`}>
-                                    <span className="text-xs">Overview</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                                <SidebarMenuSubButton asChild data-active={location === `/student/courses/${room.id}/tutor`}>
-                                  <Link href={`/student/courses/${room.id}/tutor`}>
-                                    <Bot className="h-3 w-3" />
-                                    <span className="text-xs">AI Tutor</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </CollapsibleContent>
-                            </SidebarMenuSubItem>
-                          </Collapsible>
+                          <SidebarMenuSubItem key={room.id}>
+                            <SidebarMenuSubButton asChild data-active={location.includes(`/courses/${room.id}`)}>
+                              <Link href={`/student/courses/${room.id}`}>
+                                <FolderOpen className="h-4 w-4" />
+                                <span className="truncate">{room.name}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
                         ))
                       )}
                     </SidebarMenuSub>

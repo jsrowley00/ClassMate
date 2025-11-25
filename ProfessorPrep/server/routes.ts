@@ -190,8 +190,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can update this course" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to update this course" });
       }
 
       const validated = updateCourseSchema.parse(req.body);
@@ -219,8 +219,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can delete this course" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete this course" });
       }
 
       await storage.deleteCourse(id);
@@ -242,8 +242,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can reprocess materials" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to reprocess materials" });
       }
 
       const materials = await storage.getCourseMaterials(id);
@@ -342,8 +342,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can create modules" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to create modules" });
       }
 
       const validated = insertCourseModuleSchema.parse({
@@ -373,8 +373,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can delete modules" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete modules" });
       }
 
       await storage.deleteCourseModule(moduleId);
@@ -508,8 +508,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can upload materials" });
+      // Allow both professors (for professor courses) and owners (for self-study rooms)
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to upload materials to this course" });
       }
 
       const files = req.files as Express.Multer.File[];
@@ -603,8 +604,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can update materials" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to update materials" });
       }
 
       // Validate that the material belongs to this course
@@ -651,8 +652,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can delete materials" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete materials" });
       }
 
       await storage.deleteCourseMaterial(materialId);
@@ -2350,8 +2351,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
       
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can generate learning objectives" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to generate learning objectives" });
       }
       
       // Get all modules and materials for this course
@@ -2414,8 +2415,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      if (course.professorId !== userId) {
-        return res.status(403).json({ message: "Only the course professor can generate learning objectives" });
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to generate learning objectives" });
       }
 
       // Get materials for this module and its children

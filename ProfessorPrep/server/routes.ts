@@ -12,6 +12,9 @@ import officeParser from "officeparser";
 import tmp from "tmp";
 import { writeFile, unlink } from "fs/promises";
 
+// Demo account IDs that bypass subscription requirements (for testing purposes)
+const DEMO_ACCOUNT_IDS = ["49754447"]; // Jackson Rowley
+
 // Token storage for preview URLs (in production, use Redis or similar)
 const previewTokens = new Map<string, { materialId: string; expiresAt: number }>();
 
@@ -102,6 +105,11 @@ async function checkStudentAccess(req: any, res: any, next: any) {
       return next();
     }
 
+    // Demo accounts bypass subscription checks
+    if (DEMO_ACCOUNT_IDS.includes(userId)) {
+      return next();
+    }
+
     // Check if student has active access that hasn't expired
     if (user.subscriptionStatus !== 'active') {
       return res.status(403).json({ 
@@ -161,7 +169,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Students must pay to sign up - only professors can set role directly
-      if (role === "student") {
+      // Demo accounts bypass subscription requirement
+      if (role === "student" && !DEMO_ACCOUNT_IDS.includes(userId)) {
         // Check if user has an active subscription
         const user = await storage.getUser(userId);
         if (!user?.subscriptionStatus || user.subscriptionStatus !== 'active') {

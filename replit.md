@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 
 ### AI Integration Architecture
 
-**OpenAI Integration**: All AI features powered by OpenAI API (configured to use GPT-5 model). Core AI capabilities include:
+**OpenAI Integration**: All AI features powered by OpenAI API (configured to use GPT-4o-mini model for faster and cheaper token usage). Core AI capabilities include:
 
 1. **Learning Objective Generation**: Automatically creates SMART learning objectives from uploaded course materials, analyzing text content to identify key concepts and skills students should master.
 
@@ -60,7 +60,7 @@ Preferred communication style: Simple, everyday language.
 
 **Replit Auth**: Provides OpenID Connect authentication with automatic user provisioning. Handles user sessions, profile data (email, name, profile image), and role management (professor/student designation).
 
-**OpenAI API**: Core dependency for all AI-powered features. Requires `OPENAI_API_KEY` environment variable. Powers learning objective generation, practice test question creation, flashcard generation, AI tutoring conversations, and analytics categorization. Configured to use GPT-5 model (latest as of August 2025).
+**OpenAI API**: Core dependency for all AI-powered features. Requires `OPENAI_API_KEY` environment variable. Powers learning objective generation, practice test question creation, flashcard generation, AI tutoring conversations, and analytics categorization. Configured to use GPT-4o-mini model for faster and cheaper token usage.
 
 **Neon Serverless PostgreSQL**: Primary database using Neon's serverless PostgreSQL offering. Requires `DATABASE_URL` environment variable. Database may suspend during inactivity and requires wake-up queries before use. Connection pooling configured via `@neondatabase/serverless` package with WebSocket support.
 

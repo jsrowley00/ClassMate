@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+// Using GPT-4o-mini for faster and cheaper token usage as requested by the user
 // This is using OpenAI's API directly with your own API key.
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -61,7 +61,7 @@ For mixed mode, vary both the question types AND the topics covered.`;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -169,7 +169,7 @@ Return a JSON object with this structure:
 }`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -258,7 +258,7 @@ Return a JSON object with this structure:
 }`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -374,7 +374,7 @@ Return your response as a JSON array of flashcards. Each flashcard should have:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -496,7 +496,7 @@ ${materialContent}${missedQuestionsContext}`,
     ];
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o-mini",
       messages,
       max_completion_tokens: 8192,
     });

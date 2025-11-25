@@ -39,6 +39,7 @@ import { ArrowLeft, Upload, FileText, File, Image as ImageIcon, Trash2, Video, U
 import { Link, useParams, useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Course, CourseMaterial, User, CourseModule } from "@shared/schema";
+import { StudentAnalyticsDialog } from "@/components/StudentAnalyticsDialog";
 
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +58,9 @@ export default function CourseDetail() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudentName, setSelectedStudentName] = useState<string>("");
+  const [studentAnalyticsOpen, setStudentAnalyticsOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -1283,11 +1287,22 @@ export default function CourseDetail() {
               {students.map((student) => (
                 <div
                   key={student.id}
-                  className="flex items-center justify-between p-3 border rounded-md"
+                  className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors"
                   data-testid={`student-item-${student.id}`}
                 >
-                  <div className="flex-1">
-                    <div className="font-medium">
+                  <div
+                    className="flex-1 cursor-pointer"
+                    onClick={() => {
+                      setSelectedStudentId(student.id);
+                      setSelectedStudentName(
+                        student.firstName && student.lastName
+                          ? `${student.firstName} ${student.lastName}`
+                          : (student.email || "Unknown Student")
+                      );
+                      setStudentAnalyticsOpen(true);
+                    }}
+                  >
+                    <div className="font-medium hover:text-primary transition-colors">
                       {student.firstName && student.lastName
                         ? `${student.firstName} ${student.lastName}`
                         : student.email}
@@ -1629,6 +1644,17 @@ export default function CourseDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Student Analytics Dialog */}
+      {selectedStudentId && id && (
+        <StudentAnalyticsDialog
+          open={studentAnalyticsOpen}
+          onOpenChange={setStudentAnalyticsOpen}
+          courseId={id}
+          studentId={selectedStudentId}
+          studentName={selectedStudentName}
+        />
+      )}
     </div>
   );
 }

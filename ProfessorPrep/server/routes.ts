@@ -1492,6 +1492,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Individual student analytics
+  app.get('/api/courses/:courseId/students/:studentId/analytics', isAuthenticated, async (req: any, res) => {
+    try {
+      const { courseId, studentId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const course = await storage.getCourse(courseId);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      // Only professors can view student analytics
+      if (course.professorId !== userId) {
+        return res.status(403).json({ message: "Only the course professor can view student analytics" });
+      }
+
+      // Verify student is enrolled in the course
+      const isEnrolled = await storage.isEnrolled(studentId, courseId);
+      if (!isEnrolled) {
+        return res.status(404).json({ message: "Student not enrolled in this course" });
+      }
+
+      // Get student info
+      const student = await storage.getUser(studentId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      // Get all practice tests for this student in this course
+      const allTests = await storage.getPracticeTests(studentId, courseId);
+      // Defensive filter to ensure we only include tests for this specific course
+      const courseTests = allTests.filter(t => t.courseId === courseId);
+      const completedTests = courseTests.filter(t => t.completed && t.score !== null);
+
+      // Sort by completedAt descending to get most recent first
+      const sortedTests = completedTests.sort((a, b) => {
+        const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+        const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      // Calculate practice test statistics
+      const practiceTestStats = {
+        totalTests: completedTests.length,
+        averageScore: completedTests.length > 0
+          ? Math.round(completedTests.reduce((sum, t) => sum + (t.score || 0), 0) / completedTests.length)
+          : 0,
+        recentTests: sortedTests.slice(0, 5).map(test => ({
+          id: test.id,
+          testMode: test.testMode,
+          score: test.score,
+          completedAt: test.completedAt,
+          questionCount: Array.isArray(test.questions) ? test.questions.length : 0,
+        })),
+      };
+
+      // Get learning objectives progress
+      const allModules = await storage.getCourseModules(courseId);
+      const courseObjectives = await storage.getLearningObjectivesByCourse(courseId);
+      
+      // Create a map: moduleId -> objectives array
+      const objectivesMap = new Map<string, string[]>();
+      courseObjectives.forEach(obj => {
+        objectivesMap.set(obj.moduleId, obj.objectives);
+      });
+      
+      // Get student's mastery data
+      const masteryData = await storage.getStudentObjectiveMastery(studentId, courseId);
+      const { evaluateObjectiveMastery } = await import('./masteryRubric');
+      
+      // Create a map for quick lookup: moduleId-objectiveIndex -> mastery data
+      const masteryMap = new Map<string, typeof masteryData[0]>();
+      masteryData.forEach(m => {
+        const key = `${m.moduleId}-${m.objectiveIndex}`;
+        masteryMap.set(key, m);
+      });
+
+      // Build learning objectives progress
+      const learningObjectivesProgress = await Promise.all(allModules.map(async (module) => {
+        const moduleObjectives = objectivesMap.get(module.id);
+        
+        if (!moduleObjectives) {
+          return {
+            moduleId: module.id,
+            moduleName: module.name,
+            objectivesDefined: false,
+            objectives: [],
+          };
+        }
+        
+        // Map each objective with its mastery data
+        const objectivesWithMastery = await Promise.all(moduleObjectives.map(async (objectiveText, index) => {
+          const key = `${module.id}-${index}`;
+          const mastery = masteryMap.get(key);
+          
+          let status = 'not_started';
+          let correctCount = 0;
+          let totalAttempts = 0;
+          
+          if (mastery) {
+            const attempts = await storage.getPracticeAttemptsForObjective(studentId, module.id, index);
+            const evaluation = await evaluateObjectiveMastery(attempts);
+            status = evaluation.status;
+            correctCount = mastery.correctCount || 0;
+            totalAttempts = mastery.totalCount || 0;
+          }
+          
+          return {
+            objectiveIndex: index,
+            objectiveText,
+            status,
+            correctCount,
+            totalAttempts,
+          };
+        }));
+        
+        return {
+          moduleId: module.id,
+          moduleName: module.name,
+          objectivesDefined: true,
+          objectives: objectivesWithMastery,
+        };
+      }));
+
+      // Calculate summary stats for learning objectives
+      const totalObjectives = learningObjectivesProgress.reduce((sum, module) => 
+        sum + (module.objectivesDefined ? module.objectives.length : 0), 0
+      );
+      const masteredObjectives = learningObjectivesProgress.reduce((sum, module) => 
+        sum + module.objectives.filter(obj => obj.status === 'mastered').length, 0
+      );
+
+      res.json({
+        student: {
+          id: student.id,
+          email: student.email,
+          firstName: student.firstName,
+          lastName: student.lastName,
+        },
+        practiceTests: practiceTestStats,
+        learningObjectives: {
+          summary: {
+            totalObjectives,
+            masteredObjectives,
+            masteryPercentage: totalObjectives > 0 
+              ? Math.round((masteredObjectives / totalObjectives) * 100)
+              : 0,
+          },
+          modules: learningObjectivesProgress,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching student analytics:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch student analytics" });
+    }
+  });
+
   // Chat routes
   app.get('/api/courses/:id/chat', isAuthenticated, async (req: any, res) => {
     try {

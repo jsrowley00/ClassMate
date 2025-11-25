@@ -2,12 +2,16 @@ import rateLimit from 'express-rate-limit';
 import type { Request } from 'express';
 
 // Rate limiting for AI-powered features to prevent excessive API costs
-// These limits are per authenticated user (or IP for unauthenticated requests)
+// These limits are per authenticated user
 
-// Helper to identify users by their authenticated ID (better than IP-based)
+// Helper to identify users by their authenticated ID
+// Note: All AI endpoints require authentication, so user ID will always be present
 const getUserKey = (req: Request): string => {
   const user = req.user as any;
-  return user?.claims?.sub || req.ip || 'anonymous';
+  if (!user?.claims?.sub) {
+    throw new Error('User ID not found - authentication required');
+  }
+  return user.claims.sub;
 };
 
 // Practice test generation - allow 15 tests per hour

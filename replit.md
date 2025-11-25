@@ -46,11 +46,11 @@ Preferred communication style: Simple, everyday language.
 
 5. **Analytics Processing**: Categorizes missed questions intelligently based on available data. When learning objectives are present, uses `matchQuestionsToLearningObjectives` to map questions to specific objectives. Falls back to `categorizeQuestionsIntoTopics` for broad topic categorization when objectives are unavailable. API response includes `usesLearningObjectives` flag to indicate which method was used, enabling appropriate UI labeling.
 
-**AI Rate Limiting**: User-based rate limiting protects against excessive OpenAI API costs using `express-rate-limit` middleware. Limits are calculated to cap spending at ~$0.75/user/hour with GPT-4o-mini pricing:
+**AI Rate Limiting**: User-based rate limiting protects against excessive OpenAI API costs using `express-rate-limit` middleware. Limits are calculated to balance user experience with cost control using GPT-4o-mini pricing:
 - Practice Tests: 15 per hour (~$0.30/hour max)
 - AI Chat Messages: 50 per hour (~$0.75/hour max)
 - Flashcard Generation: 15 per hour (~$0.30/hour max)
-- Learning Objectives: 30 per hour (~$0.30/hour max)
+- Learning Objectives: 100 per hour (~$1.00/hour max, higher limit since auto-generated during material uploads)
 
 Rate limits track authenticated user IDs (not IP addresses) for accurate per-user enforcement. Exceeded limits return 429 status with clear user-friendly error messages.
 

@@ -62,12 +62,13 @@ export const flashcardLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Learning objectives generation - allow 30 per hour (professors might batch process)
+// Learning objectives generation - allow 100 per hour (auto-generated during material uploads)
 // Reasoning: Each generation uses ~500-1000 tokens with GPT-4o-mini (~$0.005-0.01/generation)
-// 30 generations/hour = ~$0.30/hour max per professor
+// 100 generations/hour = ~$1.00/hour max per professor
+// Higher limit since objectives are auto-generated when professors upload course materials
 export const objectivesLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 30,
+  max: 100,
   keyGenerator: getUserKey,
   handler: (req, res) => {
     res.status(429).json({

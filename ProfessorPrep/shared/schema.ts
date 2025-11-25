@@ -97,8 +97,9 @@ export const practiceTests = pgTable("practice_tests", {
 // Chat sessions table
 export const chatSessions = pgTable("chat_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  courseId: varchar("course_id").references(() => courses.id, { onDelete: 'cascade' }), // Nullable for global sessions
   studentId: varchar("student_id").notNull().references(() => users.id),
+  sessionType: varchar("session_type").notNull().default("course"), // "course" or "global"
   title: text("title"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

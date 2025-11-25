@@ -4,7 +4,9 @@
 
 ClassMate is an AI-powered educational platform that transforms traditional course materials into interactive learning experiences. Professors upload study materials (PDFs, Word docs, PowerPoint, images, videos) which are then processed to generate AI-enhanced study tools. Students can access AI-generated practice tests, flashcards, and personalized tutoring based on their professor's actual course content. The platform features hierarchical course organization through modules, automatic learning objective generation, and intelligent question randomization to ensure varied, effective study sessions.
 
-**Self-Study Rooms**: Students whose professors don't use ClassMate can create their own private study spaces to upload materials and access all AI study tools. Self-study rooms use a dual-mode course system where `courseType="self-study"` distinguishes personal study spaces from professor-led courses. Students can create unlimited self-study rooms (planned $12/month subscription model for future monetization).
+**Self-Study Rooms**: Students whose professors don't use ClassMate can create their own private study spaces to upload materials and access all AI study tools. Self-study rooms use a dual-mode course system where `courseType="self-study"` distinguishes personal study spaces from professor-led courses. Students can create unlimited self-study rooms.
+
+**Subscription Model**: Students must pay a $12/month subscription to sign up and access all features. Professors sign up for free. Payment is handled via Stripe integration during the role selection flow.
 
 ## User Preferences
 
@@ -119,3 +121,11 @@ The global tutor route accepts optional session ID (`/global-tutor/:sessionId?`)
 - **Development Tools**: Replit-specific plugins for runtime error overlay, cartographer, and dev banner
 
 **Session Storage**: PostgreSQL table created by `connect-pg-simple` for storing Express sessions, eliminating need for Redis or similar services.
+
+**Stripe Integration**: Payment processing via Stripe Checkout with `stripe-replit-sync` for database synchronization. The integration handles:
+- Product/price sync from Stripe to PostgreSQL `stripe` schema
+- Managed webhooks for real-time subscription updates
+- Checkout sessions for student signup payments
+- Customer portal for subscription management
+
+Users table includes `stripeCustomerId`, `stripeSubscriptionId`, and `subscriptionStatus` fields for tracking subscription state. The seed script (`server/seed-stripe-products.ts`) creates the student subscription product ($12/month) in Stripe.

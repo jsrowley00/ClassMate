@@ -13,6 +13,8 @@ import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import RoleSelection from "@/pages/role-selection";
+import CheckoutSuccess from "@/pages/checkout/success";
+import CheckoutCancel from "@/pages/checkout/cancel";
 
 import ProfessorDashboard from "@/pages/professor/dashboard";
 import ProfessorCourses from "@/pages/professor/courses";
@@ -50,7 +52,15 @@ function Router() {
   }
 
   if (!user?.role) {
-    return <RoleSelection />;
+    return (
+      <Switch>
+        <Route path="/checkout/success" component={CheckoutSuccess} />
+        <Route path="/checkout/cancel" component={CheckoutCancel} />
+        <Route>
+          <RoleSelection />
+        </Route>
+      </Switch>
+    );
   }
 
   const sidebarStyle = {

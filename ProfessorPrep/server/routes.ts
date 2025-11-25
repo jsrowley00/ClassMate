@@ -109,6 +109,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid role" });
       }
 
+      // Students must pay to sign up - only professors can set role directly
+      if (role === "student") {
+        // Check if user has an active subscription
+        const user = await storage.getUser(userId);
+        if (!user?.subscriptionStatus || user.subscriptionStatus !== 'active') {
+          return res.status(403).json({ 
+            message: "Students must subscribe to access ClassMate. Please complete the payment process.",
+            requiresPayment: true
+          });
+        }
+      }
+
       const user = await storage.upsertUser({
         id: userId,
         role,
@@ -2485,6 +2497,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching course learning objectives:", error);
       res.status(500).json({ message: "Failed to fetch learning objectives" });
+    }
+  });
+
+  // ============ STRIPE PAYMENT ROUTES ============
+  
+  // Get Stripe publishable key for frontend
+  app.get('/api/stripe/config', async (req, res) => {
+    try {
+      const { getStripePublishableKey } = await import('./stripeClient');
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Error getting Stripe config:", error);
+      res.status(500).json({ message: "Failed to get Stripe configuration" });
+    }
+  });
+
+  // Get available subscription products and prices
+  app.get('/api/stripe/products', async (req, res) => {
+    try {
+      const { stripeService } = await import('./stripeService');
+      const productsWithPrices = await stripeService.listProductsWithPrices();
+      
+      const productsMap = new Map();
+      for (const row of productsWithPrices as any[]) {
+        if (!productsMap.has(row.product_id)) {
+          productsMap.set(row.product_id, {
+            id: row.product_id,
+            name: row.product_name,
+            description: row.product_description,
+            active: row.product_active,
+            metadata: row.product_metadata,
+            prices: []
+          });
+        }
+        if (row.price_id) {
+          productsMap.get(row.product_id).prices.push({
+            id: row.price_id,
+            unit_amount: row.unit_amount,
+            currency: row.currency,
+            recurring: row.recurring,
+            active: row.price_active,
+          });
+        }
+      }
+
+      res.json({ products: Array.from(productsMap.values()) });
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  // Create checkout session for student signup
+  app.post('/api/stripe/create-checkout-session', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { priceId } = req.body;
+
+      if (!priceId) {
+        return res.status(400).json({ message: "Price ID is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { stripeService } = await import('./stripeService');
+      const { getUncachableStripeClient } = await import('./stripeClient');
+      const stripe = await getUncachableStripeClient();
+
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripeService.createCustomer(user.email || '', userId);
+        await storage.upsertUser({
+          id: userId,
+          stripeCustomerId: customer.id,
+        });
+        customerId = customer.id;
+      }
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        mode: 'subscription',
+        success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/checkout/cancel`,
+        metadata: {
+          userId: userId,
+        },
+      });
+
+      res.json({ sessionId: session.id, url: session.url });
+    } catch (error: any) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ message: error.message || "Failed to create checkout session" });
+    }
+  });
+
+  // Verify checkout session and activate subscription
+  app.post('/api/stripe/verify-session', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { sessionId } = req.body;
+
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      const { getUncachableStripeClient } = await import('./stripeClient');
+      const stripe = await getUncachableStripeClient();
+
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      if (session.metadata?.userId !== userId) {
+        return res.status(403).json({ message: "Session does not belong to this user" });
+      }
+
+      const subscriptionId = session.subscription as string;
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+      await storage.upsertUser({
+        id: userId,
+        stripeSubscriptionId: subscriptionId,
+        subscriptionStatus: subscription.status,
+        role: 'student',
+      });
+
+      res.json({ 
+        success: true, 
+        subscriptionId,
+        status: subscription.status 
+      });
+    } catch (error: any) {
+      console.error("Error verifying session:", error);
+      res.status(500).json({ message: error.message || "Failed to verify session" });
+    }
+  });
+
+  // Get current user's subscription status
+  app.get('/api/stripe/subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.stripeSubscriptionId) {
+        return res.json({ subscription: null });
+      }
+
+      const { stripeService } = await import('./stripeService');
+      const subscription = await stripeService.getSubscription(user.stripeSubscriptionId);
+      
+      res.json({ 
+        subscription,
+        status: user.subscriptionStatus 
+      });
+    } catch (error) {
+      console.error("Error fetching subscription:", error);
+      res.status(500).json({ message: "Failed to fetch subscription" });
+    }
+  });
+
+  // Create customer portal session for managing subscription
+  app.post('/api/stripe/create-portal-session', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user?.stripeCustomerId) {
+        return res.status(400).json({ message: "No Stripe customer found" });
+      }
+
+      const { stripeService } = await import('./stripeService');
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      const session = await stripeService.createCustomerPortalSession(
+        user.stripeCustomerId,
+        `${baseUrl}/student`
+      );
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Error creating portal session:", error);
+      res.status(500).json({ message: error.message || "Failed to create portal session" });
     }
   });
 

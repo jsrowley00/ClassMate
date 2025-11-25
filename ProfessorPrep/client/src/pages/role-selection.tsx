@@ -1,15 +1,46 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, BookOpen } from "lucide-react";
+import { GraduationCap, BookOpen, CreditCard, Check, Loader2 } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
+
+interface StripeProduct {
+  id: string;
+  name: string;
+  description: string;
+  prices: Array<{
+    id: string;
+    unit_amount: number;
+    currency: string;
+    recurring: { interval: string } | null;
+  }>;
+}
 
 export default function RoleSelection() {
   const { toast } = useToast();
   const [selectedRole, setSelectedRole] = useState<"professor" | "student" | null>(null);
+  const [showPayment, setShowPayment] = useState(false);
+
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ["/api/stripe/products"],
+    queryFn: async () => {
+      const response = await fetch("/api/stripe/products");
+      if (!response.ok) throw new Error("Failed to fetch products");
+      return response.json();
+    },
+  });
+
+  const products: StripeProduct[] = productsData?.products || [];
+  const studentSubscription = products.find(p => 
+    p.name?.toLowerCase().includes("student") || 
+    (p as any).metadata?.type === "student_subscription"
+  );
+  const monthlyPrice = studentSubscription?.prices?.find(p => 
+    p.recurring?.interval === "month"
+  );
 
   const setRoleMutation = useMutation({
     mutationFn: async (role: "professor" | "student") => {
@@ -39,10 +70,140 @@ export default function RoleSelection() {
     },
   });
 
-  const handleRoleSelect = (role: "professor" | "student") => {
-    setSelectedRole(role);
-    setRoleMutation.mutate(role);
+  const createCheckoutMutation = useMutation({
+    mutationFn: async (priceId: string) => {
+      const response = await apiRequest("POST", "/api/stripe/create-checkout-session", { priceId });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start checkout",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleProfessorSelect = () => {
+    setSelectedRole("professor");
+    setRoleMutation.mutate("professor");
   };
+
+  const handleStudentSelect = () => {
+    setSelectedRole("student");
+    setShowPayment(true);
+  };
+
+  const handleStartPayment = () => {
+    if (monthlyPrice) {
+      createCheckoutMutation.mutate(monthlyPrice.id);
+    }
+  };
+
+  const formatPrice = (amount: number, currency: string) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount / 100);
+  };
+
+  if (showPayment) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <GraduationCap className="h-10 w-10 text-primary" />
+              <span className="text-3xl font-bold">ClassMate</span>
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Complete Your Subscription</h1>
+            <p className="text-muted-foreground">
+              Get unlimited access to all ClassMate study tools
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Student Subscription</span>
+                {monthlyPrice && (
+                  <span className="text-primary">
+                    {formatPrice(monthlyPrice.unit_amount, monthlyPrice.currency)}/month
+                  </span>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Everything you need to excel in your studies
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-green-500" />
+                  <span>AI-generated practice tests</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-green-500" />
+                  <span>Smart flashcard creation</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-green-500" />
+                  <span>Personal AI tutor for every course</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-green-500" />
+                  <span>Unlimited self-study rooms</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-5 w-5 text-green-500" />
+                  <span>Progress tracking & mastery analytics</span>
+                </li>
+              </ul>
+
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={handleStartPayment}
+                disabled={createCheckoutMutation.isPending || !monthlyPrice}
+              >
+                {createCheckoutMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Redirecting to checkout...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Subscribe Now
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="w-full mt-3"
+                onClick={() => {
+                  setShowPayment(false);
+                  setSelectedRole(null);
+                }}
+              >
+                Back to role selection
+              </Button>
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            Secure payment powered by Stripe. Cancel anytime.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -63,7 +224,7 @@ export default function RoleSelection() {
             className={`cursor-pointer transition-all hover-elevate ${
               selectedRole === "professor" ? "border-primary ring-2 ring-primary" : ""
             }`}
-            onClick={() => handleRoleSelect("professor")}
+            onClick={handleProfessorSelect}
           >
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -75,6 +236,10 @@ export default function RoleSelection() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="text-center mb-4">
+                <span className="text-2xl font-bold text-green-600">Free</span>
+                <p className="text-sm text-muted-foreground">No payment required</p>
+              </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
@@ -105,7 +270,7 @@ export default function RoleSelection() {
             className={`cursor-pointer transition-all hover-elevate ${
               selectedRole === "student" ? "border-primary ring-2 ring-primary" : ""
             }`}
-            onClick={() => handleRoleSelect("student")}
+            onClick={handleStudentSelect}
           >
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -117,6 +282,20 @@ export default function RoleSelection() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="text-center mb-4">
+                {productsLoading ? (
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                ) : monthlyPrice ? (
+                  <>
+                    <span className="text-2xl font-bold text-primary">
+                      {formatPrice(monthlyPrice.unit_amount, monthlyPrice.currency)}
+                    </span>
+                    <span className="text-muted-foreground">/month</span>
+                  </>
+                ) : (
+                  <span className="text-2xl font-bold text-primary">$12/month</span>
+                )}
+              </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
@@ -138,7 +317,7 @@ export default function RoleSelection() {
               >
                 {setRoleMutation.isPending && selectedRole === "student"
                   ? "Setting up..."
-                  : "Continue as Student"}
+                  : "Subscribe as Student"}
               </Button>
             </CardContent>
           </Card>

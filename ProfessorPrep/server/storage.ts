@@ -55,6 +55,7 @@ export interface IStorage {
   // Course operations
   getCourses(): Promise<Course[]>;
   getCoursesByProfessor(professorId: string): Promise<Course[]>;
+  getSelfStudyRooms(studentId: string): Promise<Course[]>;
   getCourse(id: string): Promise<Course | undefined>;
   createCourse(course: InsertCourse): Promise<Course>;
   updateCourse(id: string, data: UpdateCourse): Promise<Course>;
@@ -167,6 +168,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(courses)
       .where(eq(courses.professorId, professorId))
+      .orderBy(desc(courses.createdAt));
+  }
+
+  async getSelfStudyRooms(studentId: string): Promise<Course[]> {
+    return await db
+      .select()
+      .from(courses)
+      .where(and(eq(courses.ownerId, studentId), eq(courses.courseType, "self-study")))
       .orderBy(desc(courses.createdAt));
   }
 

@@ -168,6 +168,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertCourseSchema.parse({
         ...req.body,
         professorId: userId,
+        ownerId: userId,
+        courseType: "professor",
       });
 
       const course = await storage.createCourse(validated);
@@ -670,6 +672,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching enrolled courses:", error);
       res.status(500).json({ message: "Failed to fetch enrolled courses" });
+    }
+  });
+
+  // Self-study room routes - Student
+  app.get('/api/student/self-study-rooms', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const rooms = await storage.getSelfStudyRooms(userId);
+      res.json(rooms);
+    } catch (error) {
+      console.error("Error fetching self-study rooms:", error);
+      res.status(500).json({ message: "Failed to fetch self-study rooms" });
+    }
+  });
+
+  app.post('/api/student/self-study-rooms', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, description } = req.body;
+
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ message: "Room name is required" });
+      }
+
+      const room = await storage.createCourse({
+        name: name.trim(),
+        description: description?.trim() || null,
+        courseType: "self-study",
+        professorId: null,
+        ownerId: userId,
+        startDate: null,
+        endDate: null,
+      });
+
+      res.status(201).json(room);
+    } catch (error) {
+      console.error("Error creating self-study room:", error);
+      res.status(500).json({ message: "Failed to create self-study room" });
     }
   });
 

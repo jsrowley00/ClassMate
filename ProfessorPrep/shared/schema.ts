@@ -41,7 +41,9 @@ export const courses = pgTable("courses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
-  professorId: varchar("professor_id").notNull().references(() => users.id),
+  courseType: varchar("course_type").notNull().default("professor"), // "professor" or "self-study"
+  professorId: varchar("professor_id").references(() => users.id), // Nullable for self-study rooms
+  ownerId: varchar("owner_id").notNull().references(() => users.id), // Owner (professor or student)
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   createdAt: timestamp("created_at").defaultNow(),

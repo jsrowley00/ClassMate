@@ -76,8 +76,15 @@ Study tool recommendations are personalized to each student's needs:
 2. Recommends which course to focus on next based on developing objectives and overall progress
 3. Provides course-level strategy and balanced progress guidance
 4. Uses GPT-4o-mini for cost-effective cross-course recommendations
+5. Supports ChatGPT-style multi-session management - students can create multiple concurrent conversations, each appearing as a separate sidebar tab
 
-Chat sessions are stored in the database with a `session_type` field ("course" or "global") to differentiate between course-specific and cross-course conversations. Global sessions have nullable `courseId` to enable student-wide context. Students access the global tutor via "Study Assistant" link in the sidebar.
+**Multi-Session Chat Architecture**: Chat sessions are stored in the database with a `session_type` field ("course" or "global") to differentiate between course-specific and cross-course conversations. Global sessions have nullable `courseId` to enable student-wide context. Each global session has a unique ID and auto-generated title (derived from first message, 50-char preview). Students access the global tutor via "Study Assistant" collapsible menu in the sidebar, which displays:
+- "New Chat" button to create fresh sessions
+- All existing global chat sessions (sorted by last updated)
+- Separator divider
+- Course-specific AI tutors for each enrolled course
+
+The global tutor route accepts optional session ID (`/global-tutor/:sessionId?`). When visiting `/global-tutor` without an ID, a new session is automatically created and the user is navigated to `/global-tutor/:sessionId`. Session creation invalidates the sidebar query to immediately display the new session. All sessions are scoped by user ID for security.
 
 **Security Considerations**: Module ID validation ensures students can only access materials from courses they're enrolled in. Preview tokens expire and are cleaned periodically. Session cookies are HTTP-only, secure, and have 1-week max age.
 

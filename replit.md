@@ -71,6 +71,14 @@ Study tool recommendations are personalized to each student's needs:
 - Flashcards: Helpful for memorizing key terms and concepts
 - AI Tutor: Best for deep conceptual understanding when stuck on topics
 
+**Global Study Assistant (Meta Tutor)**: A cross-course AI tutor that helps students prioritize their learning across all enrolled courses. The global tutor:
+1. Accesses mastery data for all courses simultaneously (completion rates, priority objectives, rubric blockers)
+2. Recommends which course to focus on next based on developing objectives and overall progress
+3. Provides course-level strategy and balanced progress guidance
+4. Uses GPT-4o-mini for cost-effective cross-course recommendations
+
+Chat sessions are stored in the database with a `session_type` field ("course" or "global") to differentiate between course-specific and cross-course conversations. Global sessions have nullable `courseId` to enable student-wide context. Students access the global tutor via "Study Assistant" link in the sidebar.
+
 **Security Considerations**: Module ID validation ensures students can only access materials from courses they're enrolled in. Preview tokens expire and are cleaned periodically. Session cookies are HTTP-only, secure, and have 1-week max age.
 
 ## External Dependencies

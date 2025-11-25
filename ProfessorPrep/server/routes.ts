@@ -177,6 +177,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/courses/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const course = await storage.getCourse(id);
+
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      if (course.professorId !== userId) {
+        return res.status(403).json({ message: "Only the course professor can update this course" });
+      }
+
+      const { name, description, startDate, endDate } = req.body;
+      const updateData: Partial<Course> = {};
+      
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
+      if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
+
+      const updatedCourse = await storage.updateCourse(id, updateData);
+      res.json(updatedCourse);
+    } catch (error: any) {
+      console.error("Error updating course:", error);
+      res.status(400).json({ message: error.message || "Failed to update course" });
+    }
+  });
+
   app.delete('/api/courses/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;

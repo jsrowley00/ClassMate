@@ -35,11 +35,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ArrowLeft, Upload, FileText, File, Image as ImageIcon, Trash2, Video, UserPlus, X, FolderPlus, Folder, Presentation, BarChart3, TrendingDown, Users, ClipboardList, ChevronDown, Pencil } from "lucide-react";
+import { ArrowLeft, Upload, FileText, File, Image as ImageIcon, Trash2, Video, UserPlus, X, FolderPlus, Folder, Presentation, BarChart3, TrendingDown, Users, ClipboardList, ChevronDown, Pencil, CalendarIcon } from "lucide-react";
 import { Link, useParams, useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Course, CourseMaterial, User, CourseModule } from "@shared/schema";
 import { StudentAnalyticsDialog } from "@/components/StudentAnalyticsDialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -58,6 +62,8 @@ export default function CourseDetail() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editStartDate, setEditStartDate] = useState<Date | undefined>(undefined);
+  const [editEndDate, setEditEndDate] = useState<Date | undefined>(undefined);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedStudentName, setSelectedStudentName] = useState<string>("");
   const [studentAnalyticsOpen, setStudentAnalyticsOpen] = useState(false);
@@ -415,7 +421,7 @@ export default function CourseDetail() {
   });
 
   const updateCourseMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string }) => {
+    mutationFn: async (data: { name: string; description: string; startDate?: Date; endDate?: Date }) => {
       return await apiRequest("PATCH", `/api/courses/${id}`, data);
     },
     onSuccess: (updatedCourse) => {
@@ -579,6 +585,8 @@ export default function CourseDetail() {
                 onClick={() => {
                   setEditName(course.name);
                   setEditDescription(course.description || "");
+                  setEditStartDate(course.startDate ? new Date(course.startDate) : undefined);
+                  setEditEndDate(course.endDate ? new Date(course.endDate) : undefined);
                 }}
                 data-testid="button-edit-course"
               >
@@ -615,6 +623,58 @@ export default function CourseDetail() {
                     data-testid="input-edit-course-description"
                   />
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date (Optional)</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !editStartDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editStartDate ? format(editStartDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={editStartDate}
+                          onSelect={setEditStartDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Date (Optional)</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !editEndDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editEndDate ? format(editEndDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={editEndDate}
+                          onSelect={setEditEndDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="outline"
@@ -628,6 +688,8 @@ export default function CourseDetail() {
                       updateCourseMutation.mutate({
                         name: editName,
                         description: editDescription,
+                        startDate: editStartDate,
+                        endDate: editEndDate,
                       });
                     }}
                     disabled={!editName.trim() || updateCourseMutation.isPending}
@@ -672,6 +734,22 @@ export default function CourseDetail() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{course.name}</h1>
         <p className="text-muted-foreground">{course.description || "No description"}</p>
+        {(course.startDate || course.endDate) && (
+          <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
+            {course.startDate && (
+              <div className="flex items-center gap-1.5">
+                <CalendarIcon className="h-4 w-4" />
+                <span>Starts: {format(new Date(course.startDate), "PPP")}</span>
+              </div>
+            )}
+            {course.endDate && (
+              <div className="flex items-center gap-1.5">
+                <CalendarIcon className="h-4 w-4" />
+                <span>Ends: {format(new Date(course.endDate), "PPP")}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Practice Test Analytics */}

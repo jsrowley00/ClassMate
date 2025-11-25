@@ -615,6 +615,24 @@ export class DatabaseStorage implements IStorage {
       );
   }
 
+  async getObjectiveMastery(
+    studentId: string,
+    moduleId: string,
+    objectiveIndex: number
+  ): Promise<ObjectiveMastery | undefined> {
+    const [mastery] = await db
+      .select()
+      .from(objectiveMastery)
+      .where(
+        and(
+          eq(objectiveMastery.studentId, studentId),
+          eq(objectiveMastery.moduleId, moduleId),
+          eq(objectiveMastery.objectiveIndex, objectiveIndex)
+        )
+      );
+    return mastery;
+  }
+
   // Practice attempt operations
   async createPracticeAttempt(attemptData: InsertPracticeAttempt): Promise<PracticeAttempt> {
     const [attempt] = await db

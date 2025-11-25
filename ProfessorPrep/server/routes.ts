@@ -895,6 +895,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const questions = test.questions as any[];
       let correctCount = 0;
 
+      // Get all modules for the course to determine module order
+      const allModules = await storage.getCourseModules(test.courseId);
+
       // Get all learning objectives for the course to map objective indices
       const courseObjectives = await storage.getLearningObjectivesByCourse(test.courseId);
       
@@ -958,27 +961,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Update objective mastery if this question has objective tags
         if (question.objectiveIndices && Array.isArray(question.objectiveIndices) && test.selectedModuleIds) {
-          // For each module that was selected for this test
+          // Build list of all valid (moduleId, objectiveIndex) pairs
+          const validObjectivePairs: Array<{
+            moduleId: string;
+            objectiveIndex: number;
+            objectiveText: string;
+            moduleOrder: number;
+          }> = [];
+          
           for (const moduleId of test.selectedModuleIds) {
             const moduleObjectives = objectivesMap.get(moduleId);
             if (moduleObjectives) {
-              // For each objective this question assesses
+              // Find module's position in course structure
+              const module = allModules.find(m => m.id === moduleId);
+              const moduleOrder = module ? allModules.indexOf(module) : 999;
+              
               for (const objectiveIndex of question.objectiveIndices) {
                 // VALIDATE: Check if the index is valid for this module's current objectives
                 if (objectiveIndex >= 0 && objectiveIndex < moduleObjectives.objectives.length) {
-                  const objectiveText = moduleObjectives.objectives[objectiveIndex];
-                  
-                  // Update mastery for this objective with current canonical text
-                  await storage.updateObjectiveMastery(
-                    userId,
-                    test.courseId,
+                  validObjectivePairs.push({
                     moduleId,
                     objectiveIndex,
-                    objectiveText,
-                    wasCorrect
-                  );
+                    objectiveText: moduleObjectives.objectives[objectiveIndex],
+                    moduleOrder,
+                  });
                 } else {
-                  // Log when objective index is out of bounds (stale data from test generation)
                   console.warn(
                     `Skipping mastery update for stale objective index: ` +
                     `moduleId=${moduleId}, index=${objectiveIndex}, ` +
@@ -991,6 +998,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 `Skipping mastery update for module with no objectives: moduleId=${moduleId}`
               );
             }
+          }
+          
+          // Sort objectives by course structure order (module order first, then objective index)
+          validObjectivePairs.sort((a, b) => {
+            if (a.moduleOrder !== b.moduleOrder) {
+              return a.moduleOrder - b.moduleOrder;
+            }
+            return a.objectiveIndex - b.objectiveIndex;
+          });
+          
+          // Find the first non-mastered objective (waterfall approach)
+          let foundNonMasteredObjective = false;
+          for (const pair of validObjectivePairs) {
+            // Check current mastery status
+            const currentMastery = await storage.getObjectiveMastery(
+              userId,
+              pair.moduleId,
+              pair.objectiveIndex
+            );
+            
+            // If already mastered, skip to next objective
+            if (currentMastery && currentMastery.status === 'mastered') {
+              continue;
+            }
+            
+            // Found first non-mastered objective - update it and stop
+            await storage.updateObjectiveMastery(
+              userId,
+              test.courseId,
+              pair.moduleId,
+              pair.objectiveIndex,
+              pair.objectiveText,
+              wasCorrect
+            );
+            foundNonMasteredObjective = true;
+            break;
+          }
+          
+          // If all objectives are mastered, still update the first one
+          if (!foundNonMasteredObjective && validObjectivePairs.length > 0) {
+            const first = validObjectivePairs[0];
+            await storage.updateObjectiveMastery(
+              userId,
+              test.courseId,
+              first.moduleId,
+              first.objectiveIndex,
+              first.objectiveText,
+              wasCorrect
+            );
           }
         }
       }

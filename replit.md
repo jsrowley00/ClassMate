@@ -26,6 +26,8 @@ Preferred communication style: Simple, everyday language.
 
 **Database Layer**: Drizzle ORM with Neon's serverless PostgreSQL driver. Connection pooling via `@neondatabase/serverless` with WebSocket support for serverless environments. Database schema includes comprehensive tables for users, courses, modules, materials, enrollments, practice tests, chat sessions, flashcards, and learning objectives.
 
+**Course Management**: Courses include optional start and end date fields for tracking academic terms or course schedules. Professors can set dates during course creation or edit them later via the course detail page. Date validation ensures end dates cannot precede start dates. The update endpoint uses hardened Zod validation with robust date parsing, rejecting invalid date strings, empty payloads, and chronological violations.
+
 **File Processing**: Multer middleware handles file uploads with 10MB limit and memory storage. Text extraction supports PDF, DOCX, and PPTX formats using `mammoth` and `officeparser` libraries. Temporary files created with `tmp` library for processing, then cleaned up after extraction.
 
 **Authentication & Sessions**: Replit Auth implements OpenID Connect authentication with passport.js. Session management uses `connect-pg-simple` for PostgreSQL-backed sessions with 1-week TTL. Role-based access control distinguishes professors from students, with dedicated endpoints for role selection and switching.

@@ -41,11 +41,11 @@ The design emphasizes a clean, educational interface with a professional blue pr
 - **Frontend**: React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI for components, and Tailwind CSS for styling.
 - **Backend**: Express.js server.
 - **Database**: PostgreSQL with Drizzle ORM.
-- **Authentication**: Replit Auth for OpenID Connect authentication.
+- **Authentication**: Clerk for authentication (email/password and Google sign-in).
 - **AI Integration**: OpenAI API for all AI-powered features (test generation, tutoring, objective generation, categorization).
 
 ## External Dependencies
-- **Replit Auth**: For user authentication and role management.
+- **Clerk**: For user authentication with email/password and Google sign-in options. Configure sign-in methods in the Clerk dashboard.
 - **OpenAI API**: Powers AI-driven features including learning objective generation, flashcard creation, practice test question generation, and personalized AI tutoring.
 - **PostgreSQL**: The primary database for storing all application data.
 - **Google Docs Viewer**: Used for in-browser preview of DOCX and PPTX files.

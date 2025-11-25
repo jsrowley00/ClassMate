@@ -1,12 +1,21 @@
 import { Link, useParams, useLocation } from "wouter";
-import { BookOpen, FileText, Brain, MessageSquare, LayoutDashboard } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { BookOpen, FileText, Brain, MessageSquare, LayoutDashboard, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Course } from "@shared/schema";
 
 export function CourseTabs() {
   const { id } = useParams<{ id: string }>();
   const [location] = useLocation();
 
-  const tabs = [
+  const { data: course } = useQuery<Course>({
+    queryKey: ["/api/courses", id],
+    enabled: !!id,
+  });
+
+  const isSelfStudyRoom = course?.courseType === "self-study";
+
+  const baseTabs = [
     {
       title: "Overview",
       url: `/student/courses/${id}`,
@@ -33,6 +42,17 @@ export function CourseTabs() {
       icon: MessageSquare,
     },
   ];
+
+  const tabs = isSelfStudyRoom
+    ? [
+        ...baseTabs,
+        {
+          title: "Build Study Room",
+          url: `/student/courses/${id}/build`,
+          icon: Wrench,
+        },
+      ]
+    : baseTabs;
 
   return (
     <nav className="w-56 border-r bg-muted/20 p-4 space-y-1" data-testid="course-tabs">

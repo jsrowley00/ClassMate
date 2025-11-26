@@ -237,30 +237,12 @@ export default function RoleSelection() {
               </div>
               <CardTitle className="text-2xl">I'm a Professor</CardTitle>
               <CardDescription className="text-base">
-                Create courses and upload study materials for students
+                Create and manage courses for your students
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center mb-4">
-                <span className="text-2xl font-bold text-green-600">Free</span>
-                <p className="text-sm text-muted-foreground">No payment required</p>
-              </div>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>Create and manage courses for students</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>Upload PDFs, Word docs, and images</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>View student progress and learning</span>
-                </li>
-              </ul>
               <Button
-                className="w-full mt-6"
+                className="w-full"
                 disabled={setRoleMutation.isPending}
                 data-testid="button-select-professor"
               >
@@ -283,49 +265,18 @@ export default function RoleSelection() {
               </div>
               <CardTitle className="text-2xl">I'm a Student</CardTitle>
               <CardDescription className="text-base">
-                Enroll in courses and ace your tests with AI help
+                Enroll in courses or build your own study rooms to access AI study tools
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center mb-4">
-                {productsLoading ? (
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                ) : oneTimePrice ? (
-                  <>
-                    <span className="text-2xl font-bold text-primary">
-                      $10/month
-                    </span>
-                    <p className="text-sm text-muted-foreground">billed in 4-month increments ({formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency)})</p>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-2xl font-bold text-primary">$10/month</span>
-                    <p className="text-sm text-muted-foreground">billed in 4-month increments ($40)</p>
-                  </>
-                )}
-              </div>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>Access course study materials</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>Take AI-generated practice tests and flashcards</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2">•</span>
-                  <span>Chat with AI tutor for help</span>
-                </li>
-              </ul>
               <Button
-                className="w-full mt-6"
+                className="w-full"
                 disabled={setRoleMutation.isPending}
                 data-testid="button-select-student"
               >
                 {setRoleMutation.isPending && selectedRole === "student"
                   ? "Setting up..."
-                  : "Get Student Access"}
+                  : "Continue as Student"}
               </Button>
             </CardContent>
           </Card>

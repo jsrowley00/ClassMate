@@ -248,7 +248,7 @@ export default function RoleSelection() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
-                  <span>Create and manage multiple courses</span>
+                  <span>Create and manage courses for students</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2">•</span>

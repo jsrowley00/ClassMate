@@ -73,8 +73,8 @@ export default function RoleSelection() {
 
   const createCheckoutMutation = useMutation({
     mutationFn: async (priceId: string) => {
-      const response = await apiRequest("POST", "/api/stripe/create-checkout-session", { priceId });
-      return response.json();
+      const data = await apiRequest("POST", "/api/stripe/create-checkout-session", { priceId });
+      return data;
     },
     onSuccess: (data) => {
       if (data.url) {

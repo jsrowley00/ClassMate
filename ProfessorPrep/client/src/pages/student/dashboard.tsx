@@ -91,15 +91,16 @@ export default function StudentDashboard() {
 
   const renderCourseCard = (course: Course) => (
     <Card key={course.id} className="hover-elevate">
-      <CardHeader>
-        <CardTitle className="text-lg">{course.name}</CardTitle>
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-base">{course.name}</CardTitle>
         <CardDescription className="line-clamp-2">
           {course.description || "No description"}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="p-4 pt-2 space-y-2">
         <Button
           variant="default"
+          size="sm"
           asChild
           className="w-full"
           data-testid={`button-view-course-${course.id}`}
@@ -170,7 +171,7 @@ export default function StudentDashboard() {
         </p>
       </div>
       {enrolledLoading ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-12">
           {[1, 2, 3].map((i) => (
             <Card key={i}>
               <CardHeader>
@@ -185,7 +186,7 @@ export default function StudentDashboard() {
           ))}
         </div>
       ) : enrolledCourses && enrolledCourses.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mb-12">
           {enrolledCourses.map((course) => renderCourseCard(course))}
         </div>
       ) : (
@@ -272,7 +273,7 @@ export default function StudentDashboard() {
         </Dialog>
       </div>
       {roomsLoading ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[1, 2].map((i) => (
             <Card key={i}>
               <CardHeader>
@@ -287,7 +288,7 @@ export default function StudentDashboard() {
           ))}
         </div>
       ) : selfStudyRooms && selfStudyRooms.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {selfStudyRooms.map((room) => renderCourseCard(room))}
         </div>
       ) : (

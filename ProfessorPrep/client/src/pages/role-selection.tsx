@@ -256,7 +256,7 @@ export default function RoleSelection() {
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
-                  <span>Provide AI-powered study resources</span>
+                  <span>View student progress on learning</span>
                 </li>
               </ul>
               <Button

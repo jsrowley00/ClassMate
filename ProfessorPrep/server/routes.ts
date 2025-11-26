@@ -2575,33 +2575,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get available subscription products and prices
   app.get('/api/stripe/products', async (req, res) => {
     try {
-      const { stripeService } = await import('./stripeService');
-      const productsWithPrices = await stripeService.listProductsWithPrices();
+      const { getUncachableStripeClient } = await import('./stripeClient');
+      const stripe = await getUncachableStripeClient();
       
-      const productsMap = new Map();
-      for (const row of productsWithPrices as any[]) {
-        if (!productsMap.has(row.product_id)) {
-          productsMap.set(row.product_id, {
-            id: row.product_id,
-            name: row.product_name,
-            description: row.product_description,
-            active: row.product_active,
-            metadata: row.product_metadata,
-            prices: []
-          });
-        }
-        if (row.price_id) {
-          productsMap.get(row.product_id).prices.push({
-            id: row.price_id,
-            unit_amount: row.unit_amount,
-            currency: row.currency,
-            recurring: row.recurring,
-            active: row.price_active,
-          });
-        }
-      }
+      const products = await stripe.products.list({ active: true, limit: 20 });
+      const prices = await stripe.prices.list({ active: true, limit: 100 });
+      
+      const productsWithPrices = products.data.map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        active: product.active,
+        metadata: product.metadata,
+        prices: prices.data
+          .filter(price => price.product === product.id)
+          .map(price => ({
+            id: price.id,
+            unit_amount: price.unit_amount,
+            currency: price.currency,
+            recurring: price.recurring,
+            active: price.active,
+          }))
+      }));
 
-      res.json({ products: Array.from(productsMap.values()) });
+      res.json({ products: productsWithPrices });
     } catch (error) {
       console.error("Error fetching products:", error);
       res.status(500).json({ message: "Failed to fetch products" });

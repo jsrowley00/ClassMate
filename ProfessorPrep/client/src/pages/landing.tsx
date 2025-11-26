@@ -16,7 +16,7 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <SignInButton mode="modal">
+            <SignInButton mode="redirect">
               <Button data-testid="button-login">Sign In</Button>
             </SignInButton>
           </div>
@@ -37,7 +37,7 @@ export default function Landing() {
               tutoring tailored to your professor's course content.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <SignInButton mode="modal">
+              <SignInButton mode="redirect">
                 <Button size="lg" data-testid="button-get-started">Get Started</Button>
               </SignInButton>
               <Button size="lg" variant="outline" asChild>
@@ -196,7 +196,7 @@ export default function Landing() {
           <p className="text-xl mb-8 opacity-90">
             Join thousands of students and professors using AI to achieve academic excellence.
           </p>
-          <SignInButton mode="modal">
+          <SignInButton mode="redirect">
             <Button size="lg" variant="secondary" data-testid="button-cta-signup">Start Learning Today</Button>
           </SignInButton>
         </div>

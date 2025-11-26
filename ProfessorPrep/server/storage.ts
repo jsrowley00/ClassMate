@@ -170,11 +170,14 @@ export class DatabaseStorage implements IStorage {
         const oldId = existingUserByEmail.id;
         const newId = userData.id;
         
-        // Migration approach: insert new user, update references, delete old user
-        // Step 1: Insert new user record with new ID (copy all data from old record)
+        // Migration approach for users with same email but different ID (e.g., Replit Auth -> Clerk)
+        // Step 1: Clear email from old record to avoid unique constraint violation
+        await db.update(users).set({ email: null }).where(eq(users.id, oldId));
+        
+        // Step 2: Insert new user record with new ID (copy all data from old record)
         await db.insert(users).values({
           id: newId,
-          email: existingUserByEmail.email,
+          email: userData.email,
           firstName: userData.firstName || existingUserByEmail.firstName,
           lastName: userData.lastName || existingUserByEmail.lastName,
           profileImageUrl: userData.profileImageUrl || existingUserByEmail.profileImageUrl,
@@ -187,7 +190,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date(),
         });
         
-        // Step 2: Update all foreign key references to use the new ID
+        // Step 3: Update all foreign key references to use the new ID
         await db.execute(sql`UPDATE chat_messages SET sender_id = ${newId} WHERE sender_id = ${oldId}`);
         await db.execute(sql`UPDATE chat_sessions SET student_id = ${newId} WHERE student_id = ${oldId}`);
         await db.execute(sql`UPDATE course_enrollments SET student_id = ${newId} WHERE student_id = ${oldId}`);
@@ -198,7 +201,7 @@ export class DatabaseStorage implements IStorage {
         await db.execute(sql`UPDATE practice_attempts SET student_id = ${newId} WHERE student_id = ${oldId}`);
         await db.execute(sql`UPDATE practice_tests SET student_id = ${newId} WHERE student_id = ${oldId}`);
         
-        // Step 3: Delete the old user record
+        // Step 4: Delete the old user record (now has no references)
         await db.delete(users).where(eq(users.id, oldId));
         
         // Return the new user
@@ -207,9 +210,13 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
+    // New user - insert with null role so they go through role selection
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({
+        ...userData,
+        role: null,
+      })
       .returning();
     return user;
   }

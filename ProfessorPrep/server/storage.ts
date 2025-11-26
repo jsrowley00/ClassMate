@@ -170,7 +170,24 @@ export class DatabaseStorage implements IStorage {
         const oldId = existingUserByEmail.id;
         const newId = userData.id;
         
-        // Update all foreign key references to use the new ID
+        // Migration approach: insert new user, update references, delete old user
+        // Step 1: Insert new user record with new ID (copy all data from old record)
+        await db.insert(users).values({
+          id: newId,
+          email: existingUserByEmail.email,
+          firstName: userData.firstName || existingUserByEmail.firstName,
+          lastName: userData.lastName || existingUserByEmail.lastName,
+          profileImageUrl: userData.profileImageUrl || existingUserByEmail.profileImageUrl,
+          role: existingUserByEmail.role,
+          stripeCustomerId: existingUserByEmail.stripeCustomerId,
+          stripePaymentId: existingUserByEmail.stripePaymentId,
+          subscriptionStatus: existingUserByEmail.subscriptionStatus,
+          subscriptionExpiresAt: existingUserByEmail.subscriptionExpiresAt,
+          createdAt: existingUserByEmail.createdAt,
+          updatedAt: new Date(),
+        });
+        
+        // Step 2: Update all foreign key references to use the new ID
         await db.execute(sql`UPDATE chat_messages SET sender_id = ${newId} WHERE sender_id = ${oldId}`);
         await db.execute(sql`UPDATE chat_sessions SET student_id = ${newId} WHERE student_id = ${oldId}`);
         await db.execute(sql`UPDATE course_enrollments SET student_id = ${newId} WHERE student_id = ${oldId}`);
@@ -181,19 +198,12 @@ export class DatabaseStorage implements IStorage {
         await db.execute(sql`UPDATE practice_attempts SET student_id = ${newId} WHERE student_id = ${oldId}`);
         await db.execute(sql`UPDATE practice_tests SET student_id = ${newId} WHERE student_id = ${oldId}`);
         
-        // Now update the user's ID
-        const [user] = await db
-          .update(users)
-          .set({
-            id: newId,
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            profileImageUrl: userData.profileImageUrl,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, oldId))
-          .returning();
-        return user;
+        // Step 3: Delete the old user record
+        await db.delete(users).where(eq(users.id, oldId));
+        
+        // Return the new user
+        const newUser = await this.getUser(newId);
+        return newUser!;
       }
     }
     

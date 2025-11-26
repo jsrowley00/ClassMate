@@ -86,7 +86,7 @@ function Router() {
 
   if (isProfessor) {
     return (
-      <SidebarProvider style={sidebarStyle}>
+      <SidebarProvider style={sidebarStyle} defaultOpen={false}>
         <div className="flex h-screen w-full overflow-hidden">
           <ProfessorSidebar />
           <div className="flex flex-col flex-1">
@@ -116,7 +116,7 @@ function Router() {
 
   if (isStudent) {
     return (
-      <SidebarProvider style={sidebarStyle}>
+      <SidebarProvider style={sidebarStyle} defaultOpen={false}>
         <div className="flex h-screen w-full overflow-hidden">
           <StudentSidebar />
           <div className="flex flex-col flex-1">

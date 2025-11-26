@@ -7,8 +7,13 @@ export async function setupAuth(app: Express) {
   
   app.use(clerkMiddleware());
   
-  // Handle legacy logout route - redirect to home page
+  // Handle legacy logout route - redirect to landing page
   app.get("/api/logout", (_req, res) => {
+    res.redirect("/");
+  });
+  
+  // Also handle POST for logout
+  app.post("/api/logout", (_req, res) => {
     res.redirect("/");
   });
 }

@@ -124,7 +124,7 @@ export default function RoleSelection() {
             </div>
             <h1 className="text-2xl font-bold mb-2">Get Student Access</h1>
             <p className="text-muted-foreground">
-              One-time purchase for 4 months of full access
+              $10/month, billed in 4-month increments
             </p>
           </div>
 
@@ -134,12 +134,12 @@ export default function RoleSelection() {
                 <span>4-Month Student Access</span>
                 {oneTimePrice && (
                   <span className="text-primary text-2xl font-bold">
-                    {formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency)}
+                    $10/mo
                   </span>
                 )}
               </CardTitle>
               <CardDescription>
-                One-time purchase - access any class added during your 4-month period
+                Billed as {oneTimePrice ? formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency) : '$40'} every 4 months
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -184,7 +184,7 @@ export default function RoleSelection() {
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-4 w-4" />
-                    Get Access - {oneTimePrice ? formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency) : '$40'}
+                    Get Access - $10/month
                   </>
                 )}
               </Button>
@@ -203,7 +203,7 @@ export default function RoleSelection() {
           </Card>
 
           <p className="text-center text-xs text-muted-foreground mt-4">
-            Secure payment powered by Stripe. One-time payment, no recurring charges.
+            Secure payment powered by Stripe. Billed every 4 months.
           </p>
         </div>
       </div>
@@ -293,14 +293,14 @@ export default function RoleSelection() {
                 ) : oneTimePrice ? (
                   <>
                     <span className="text-2xl font-bold text-primary">
-                      {formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency)}
+                      $10/month
                     </span>
-                    <p className="text-sm text-muted-foreground">one-time for 4 months</p>
+                    <p className="text-sm text-muted-foreground">billed in 4-month increments ({formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency)})</p>
                   </>
                 ) : (
                   <>
-                    <span className="text-2xl font-bold text-primary">$40</span>
-                    <p className="text-sm text-muted-foreground">one-time for 4 months</p>
+                    <span className="text-2xl font-bold text-primary">$10/month</span>
+                    <p className="text-sm text-muted-foreground">billed in 4-month increments ($40)</p>
                   </>
                 )}
               </div>

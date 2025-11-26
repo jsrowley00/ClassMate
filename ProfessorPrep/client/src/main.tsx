@@ -12,8 +12,8 @@ if (!PUBLISHABLE_KEY) {
 createRoot(document.getElementById("root")!).render(
   <ClerkProvider 
     publishableKey={PUBLISHABLE_KEY}
-    afterSignInUrl="/"
-    afterSignUpUrl="/"
+    signInFallbackRedirectUrl="/"
+    signUpFallbackRedirectUrl="/"
   >
     <ClerkLoading>
       <div className="min-h-screen flex items-center justify-center">

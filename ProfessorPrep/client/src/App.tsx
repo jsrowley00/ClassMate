@@ -25,6 +25,8 @@ function TokenSetup() {
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import RoleSelection from "@/pages/role-selection";
+import SignInPage from "@/pages/sign-in";
+import SignUpPage from "@/pages/sign-up";
 import CheckoutSuccess from "@/pages/checkout/success";
 import CheckoutCancel from "@/pages/checkout/cancel";
 
@@ -58,6 +60,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/sign-in" component={SignInPage} />
+        <Route path="/sign-up" component={SignUpPage} />
         <Route component={NotFound} />
       </Switch>
     );

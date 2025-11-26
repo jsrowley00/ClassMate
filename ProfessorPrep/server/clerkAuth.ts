@@ -6,6 +6,11 @@ export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   
   app.use(clerkMiddleware());
+  
+  // Handle legacy logout route - redirect to home page
+  app.get("/api/logout", (_req, res) => {
+    res.redirect("/");
+  });
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {

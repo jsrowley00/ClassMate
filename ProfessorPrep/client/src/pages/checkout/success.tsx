@@ -13,8 +13,8 @@ export default function CheckoutSuccess() {
 
   const verifyMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      const response = await apiRequest("POST", "/api/stripe/verify-session", { sessionId });
-      return response.json();
+      const data = await apiRequest("POST", "/api/stripe/verify-session", { sessionId });
+      return data;
     },
     onSuccess: () => {
       setVerifying(false);

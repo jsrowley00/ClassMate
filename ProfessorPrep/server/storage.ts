@@ -44,7 +44,7 @@ import {
   type InsertShortAnswerEvaluation,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -167,16 +167,31 @@ export class DatabaseStorage implements IStorage {
     if (userData.email) {
       const existingUserByEmail = await this.getUserByEmail(userData.email);
       if (existingUserByEmail) {
+        const oldId = existingUserByEmail.id;
+        const newId = userData.id;
+        
+        // Update all foreign key references to use the new ID
+        await db.execute(sql`UPDATE chat_messages SET sender_id = ${newId} WHERE sender_id = ${oldId}`);
+        await db.execute(sql`UPDATE chat_sessions SET student_id = ${newId} WHERE student_id = ${oldId}`);
+        await db.execute(sql`UPDATE course_enrollments SET student_id = ${newId} WHERE student_id = ${oldId}`);
+        await db.execute(sql`UPDATE courses SET owner_id = ${newId} WHERE owner_id = ${oldId}`);
+        await db.execute(sql`UPDATE courses SET professor_id = ${newId} WHERE professor_id = ${oldId}`);
+        await db.execute(sql`UPDATE flashcard_sets SET student_id = ${newId} WHERE student_id = ${oldId}`);
+        await db.execute(sql`UPDATE objective_mastery SET student_id = ${newId} WHERE student_id = ${oldId}`);
+        await db.execute(sql`UPDATE practice_attempts SET student_id = ${newId} WHERE student_id = ${oldId}`);
+        await db.execute(sql`UPDATE practice_tests SET student_id = ${newId} WHERE student_id = ${oldId}`);
+        
+        // Now update the user's ID
         const [user] = await db
           .update(users)
           .set({
-            id: userData.id,
+            id: newId,
             firstName: userData.firstName,
             lastName: userData.lastName,
             profileImageUrl: userData.profileImageUrl,
             updatedAt: new Date(),
           })
-          .where(eq(users.id, existingUserByEmail.id))
+          .where(eq(users.id, oldId))
           .returning();
         return user;
       }

@@ -20,11 +20,17 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
+import { useClerk } from "@clerk/clerk-react";
 import type { Course } from "@shared/schema";
 
 export function ProfessorSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { signOut } = useClerk();
+
+  const handleSignOut = () => {
+    signOut({ redirectUrl: "/" });
+  };
 
   const menuItems = [
     {
@@ -87,11 +93,9 @@ export function ProfessorSidebar() {
             </div>
           </div>
         </Link>
-        <Button variant="outline" size="sm" asChild data-testid="button-logout">
-          <a href="/api/logout" className="w-full">
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </a>
+        <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut} data-testid="button-logout">
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign Out
         </Button>
       </SidebarFooter>
     </Sidebar>
@@ -101,6 +105,11 @@ export function ProfessorSidebar() {
 export function StudentSidebar() {
   const [location] = useLocation();
   const { user, isAuthenticated, isStudent } = useAuth();
+  const { signOut } = useClerk();
+
+  const handleSignOut = () => {
+    signOut({ redirectUrl: "/" });
+  };
 
   // Only fetch data if user is authenticated AND has student role
   const shouldFetch = isAuthenticated && isStudent;
@@ -323,11 +332,9 @@ export function StudentSidebar() {
             </div>
           </div>
         </Link>
-        <Button variant="outline" size="sm" asChild data-testid="button-logout">
-          <a href="/api/logout" className="w-full">
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </a>
+        <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut} data-testid="button-logout">
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign Out
         </Button>
       </SidebarFooter>
     </Sidebar>

@@ -144,11 +144,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    if (!userData.id) {
+      throw new Error("User ID is required for upsert");
+    }
+    
     const existingUserById = await this.getUser(userData.id);
     if (existingUserById) {
       const [user] = await db
         .update(users)
         .set({
+          email: userData.email || existingUserById.email,
           firstName: userData.firstName,
           lastName: userData.lastName,
           profileImageUrl: userData.profileImageUrl,
@@ -165,6 +170,7 @@ export class DatabaseStorage implements IStorage {
         const [user] = await db
           .update(users)
           .set({
+            id: userData.id,
             firstName: userData.firstName,
             lastName: userData.lastName,
             profileImageUrl: userData.profileImageUrl,

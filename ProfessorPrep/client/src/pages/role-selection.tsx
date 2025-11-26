@@ -311,7 +311,7 @@ export default function RoleSelection() {
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2">•</span>
-                  <span>Take AI-generated practice tests</span>
+                  <span>Take AI-generated practice tests and flashcards</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2">•</span>

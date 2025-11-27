@@ -9,8 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Users, DollarSign, BookOpen, Bot, Search, ArrowUpDown } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Users, DollarSign, BookOpen, Bot, Search, ArrowUpDown, MessageSquare, FileText, GraduationCap, X } from "lucide-react";
 import { Link } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 interface PlatformMetrics {
   totalUsers: number;
@@ -59,6 +62,72 @@ interface AIUsageResponse {
   recentLogs: any[];
 }
 
+interface UserDetailData {
+  user: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    role: string | null;
+    hasProfessorAccess: boolean | null;
+    subscriptionStatus: string | null;
+    subscriptionExpiresAt: string | null;
+    stripeCustomerId: string | null;
+    createdAt: string;
+  };
+  aiUsage: {
+    byEndpoint: {
+      endpoint: string;
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCostCents: number;
+      callCount: number;
+    }[];
+    totals: {
+      totalInputTokens: number;
+      totalOutputTokens: number;
+      totalCostCents: number;
+      callCount: number;
+    };
+  };
+  flashcardSets: {
+    id: string;
+    title: string;
+    courseId: string;
+    courseName: string | null;
+    createdAt: string;
+  }[];
+  practiceTests: {
+    id: string;
+    courseId: string;
+    courseName: string | null;
+    score: number | null;
+    questions: any[];
+    completed: boolean;
+    createdAt: string;
+  }[];
+  chatSessions: {
+    id: string;
+    title: string | null;
+    sessionType: string;
+    courseId: string | null;
+    courseName: string | null;
+    createdAt: string;
+  }[];
+  enrolledCourses: {
+    courseId: string;
+    courseName: string;
+    courseType: string;
+    enrolledAt: string;
+  }[];
+  ownedCourses: {
+    id: string;
+    name: string;
+    courseType: string;
+    createdAt: string;
+  }[];
+}
+
 const ADMIN_EMAIL = "jsrowley00@gmail.com";
 
 export default function AdminDashboard() {
@@ -67,6 +136,37 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<string>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [userDetailData, setUserDetailData] = useState<UserDetailData | null>(null);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
+
+  const fetchUserDetails = async (userId: string) => {
+    setUserDetailLoading(true);
+    try {
+      const response = await apiRequest("GET", `/api/admin/users/${userId}`);
+      const data = await response.json();
+      setUserDetailData(data);
+    } catch (error) {
+      console.error("Error fetching user details:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load user details",
+        variant: "destructive",
+      });
+    } finally {
+      setUserDetailLoading(false);
+    }
+  };
+
+  const handleUserClick = (userId: string) => {
+    setSelectedUserId(userId);
+    fetchUserDetails(userId);
+  };
+
+  const closeUserDetail = () => {
+    setSelectedUserId(null);
+    setUserDetailData(null);
+  };
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -331,36 +431,43 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.email}</TableCell>
+                      {sortedUsers.map((userData) => (
+                        <TableRow key={userData.id}>
                           <TableCell>
-                            {user.firstName || user.lastName 
-                              ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                            <button
+                              onClick={() => handleUserClick(userData.id)}
+                              className="font-medium text-primary hover:underline cursor-pointer text-left"
+                            >
+                              {userData.email}
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            {userData.firstName || userData.lastName 
+                              ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
                               : '-'}
                           </TableCell>
                           <TableCell>
-                            {user.role ? (
-                              <Badge variant={user.role === 'professor' ? 'default' : 'secondary'}>
-                                {user.role}
+                            {userData.role ? (
+                              <Badge variant={userData.role === 'professor' ? 'default' : 'secondary'}>
+                                {userData.role}
                               </Badge>
                             ) : (
                               <Badge variant="outline">No role</Badge>
                             )}
                           </TableCell>
                           <TableCell>
-                            {user.subscriptionStatus ? (
+                            {userData.subscriptionStatus ? (
                               <Badge 
-                                variant={user.subscriptionStatus === 'active' ? 'default' : 'destructive'}
+                                variant={userData.subscriptionStatus === 'active' ? 'default' : 'destructive'}
                               >
-                                {user.subscriptionStatus}
+                                {userData.subscriptionStatus}
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
-                          <TableCell>{formatDate(user.subscriptionExpiresAt)}</TableCell>
-                          <TableCell>{formatDate(user.createdAt)}</TableCell>
+                          <TableCell>{formatDate(userData.subscriptionExpiresAt)}</TableCell>
+                          <TableCell>{formatDate(userData.createdAt)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -468,6 +575,294 @@ export default function AdminDashboard() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={selectedUserId !== null} onOpenChange={(open) => !open && closeUserDetail()}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              {userDetailData?.user ? (
+                <>
+                  {userDetailData.user.firstName || userDetailData.user.lastName
+                    ? `${userDetailData.user.firstName || ''} ${userDetailData.user.lastName || ''}`.trim()
+                    : userDetailData.user.email}
+                </>
+              ) : (
+                "User Details"
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {userDetailData?.user?.email}
+            </DialogDescription>
+          </DialogHeader>
+
+          {userDetailLoading ? (
+            <div className="space-y-4 p-4">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-40 w-full" />
+              <Skeleton className="h-40 w-full" />
+            </div>
+          ) : userDetailData ? (
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-6 pb-4">
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Bot className="h-4 w-4" />
+                        AI Calls
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{userDetailData.aiUsage.totals.callCount}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(userDetailData.aiUsage.totals.totalCostCents)} est. cost
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Flashcard Sets
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{userDetailData.flashcardSets.length}</div>
+                      <p className="text-xs text-muted-foreground">sets created</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4" />
+                        Practice Tests
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{userDetailData.practiceTests.length}</div>
+                      <p className="text-xs text-muted-foreground">tests taken</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Chat Sessions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{userDetailData.chatSessions.length}</div>
+                      <p className="text-xs text-muted-foreground">AI tutor chats</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">User Info</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Role</p>
+                        <p className="font-medium">
+                          {userDetailData.user.role ? (
+                            <Badge variant={userDetailData.user.role === 'professor' ? 'default' : 'secondary'}>
+                              {userDetailData.user.role}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">No role</Badge>
+                          )}
+                          {userDetailData.user.hasProfessorAccess && (
+                            <Badge variant="outline" className="ml-2">Professor Access</Badge>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Subscription</p>
+                        <p className="font-medium">
+                          {userDetailData.user.subscriptionStatus ? (
+                            <Badge variant={userDetailData.user.subscriptionStatus === 'active' ? 'default' : 'destructive'}>
+                              {userDetailData.user.subscriptionStatus}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">None</span>
+                          )}
+                          {userDetailData.user.subscriptionExpiresAt && (
+                            <span className="text-sm text-muted-foreground ml-2">
+                              (expires {formatDate(userDetailData.user.subscriptionExpiresAt)})
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Joined</p>
+                        <p className="font-medium">{formatDate(userDetailData.user.createdAt)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Stripe Customer</p>
+                        <p className="font-medium text-xs font-mono">
+                          {userDetailData.user.stripeCustomerId || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {userDetailData.aiUsage.byEndpoint.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">AI Usage by Feature</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Feature</TableHead>
+                            <TableHead className="text-right">Calls</TableHead>
+                            <TableHead className="text-right">Input Tokens</TableHead>
+                            <TableHead className="text-right">Output Tokens</TableHead>
+                            <TableHead className="text-right">Est. Cost</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {userDetailData.aiUsage.byEndpoint.map((usage, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>
+                                <Badge variant="outline">{usage.endpoint}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">{usage.callCount}</TableCell>
+                              <TableCell className="text-right">{usage.totalInputTokens.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{usage.totalOutputTokens.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(usage.totalCostCents)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Enrolled Courses ({userDetailData.enrolledCourses.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {userDetailData.enrolledCourses.length > 0 ? (
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {userDetailData.enrolledCourses.map((course, idx) => (
+                            <div key={idx} className="flex items-center justify-between border-b pb-2 last:border-0">
+                              <div>
+                                <p className="font-medium text-sm">{course.courseName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {course.courseType === 'self-study' ? 'Self-study' : 'Professor'} course
+                                </p>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(course.enrolledAt)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No enrolled courses</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Owned Courses ({userDetailData.ownedCourses.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {userDetailData.ownedCourses.length > 0 ? (
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {userDetailData.ownedCourses.map((course, idx) => (
+                            <div key={idx} className="flex items-center justify-between border-b pb-2 last:border-0">
+                              <div>
+                                <p className="font-medium text-sm">{course.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {course.courseType === 'self-study' ? 'Self-study' : 'Professor'} course
+                                </p>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(course.createdAt)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No owned courses</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {userDetailData.flashcardSets.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Recent Flashcard Sets</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {userDetailData.flashcardSets.slice(0, 10).map((set, idx) => (
+                          <div key={idx} className="flex items-center justify-between border-b pb-2 last:border-0">
+                            <div>
+                              <p className="font-medium text-sm">{set.title}</p>
+                              <p className="text-xs text-muted-foreground">{set.courseName || 'Unknown course'}</p>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(set.createdAt)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {userDetailData.practiceTests.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Recent Practice Tests</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {userDetailData.practiceTests.slice(0, 10).map((test, idx) => (
+                          <div key={idx} className="flex items-center justify-between border-b pb-2 last:border-0">
+                            <div>
+                              <p className="font-medium text-sm">{test.courseName || 'Unknown course'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {Array.isArray(test.questions) ? test.questions.length : 0} questions
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              {test.completed && test.score !== null ? (
+                                <Badge variant={test.score >= 70 ? 'default' : 'destructive'}>
+                                  {test.score}%
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">In progress</Badge>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {formatDate(test.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </ScrollArea>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

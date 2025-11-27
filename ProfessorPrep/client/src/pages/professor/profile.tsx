@@ -180,7 +180,7 @@ export default function ProfessorProfile() {
           ) : (
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
-                <Card className="border-2">
+                <Card className="border-2 flex flex-col">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex items-center justify-between">
                       <span>4-Month Access</span>
@@ -190,8 +190,8 @@ export default function ProfessorProfile() {
                       {fourMonthPrice ? formatPrice(fourMonthPrice.unit_amount, fourMonthPrice.currency) : '$40'} billed every 4 months
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 mb-4 text-sm">
+                  <CardContent className="flex flex-col flex-grow">
+                    <ul className="space-y-2 mb-4 text-sm flex-grow">
                       <li className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-green-500" />
                         AI practice tests
@@ -206,7 +206,7 @@ export default function ProfessorProfile() {
                       </li>
                     </ul>
                     <Button
-                      className="w-full"
+                      className="w-full mt-auto"
                       onClick={() => fourMonthPrice && createCheckoutMutation.mutate(fourMonthPrice.id)}
                       disabled={createCheckoutMutation.isPending || !fourMonthPrice}
                     >
@@ -219,7 +219,7 @@ export default function ProfessorProfile() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-primary relative">
+                <Card className="border-2 border-primary relative flex flex-col">
                   <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-2 py-0.5 rounded text-xs font-medium">
                     Best Value
                   </div>
@@ -232,8 +232,8 @@ export default function ProfessorProfile() {
                       {twelveMonthPrice ? formatPrice(twelveMonthPrice.unit_amount, twelveMonthPrice.currency) : '$90'} billed once per year
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2 mb-4 text-sm">
+                  <CardContent className="flex flex-col flex-grow">
+                    <ul className="space-y-2 mb-4 text-sm flex-grow">
                       <li className="flex items-center gap-2">
                         <Check className="h-4 w-4 text-green-500" />
                         AI practice tests
@@ -252,7 +252,7 @@ export default function ProfessorProfile() {
                       </li>
                     </ul>
                     <Button
-                      className="w-full"
+                      className="w-full mt-auto"
                       onClick={() => twelveMonthPrice && createCheckoutMutation.mutate(twelveMonthPrice.id)}
                       disabled={createCheckoutMutation.isPending || !twelveMonthPrice}
                     >

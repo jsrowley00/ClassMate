@@ -2733,6 +2733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             currency: price.currency,
             recurring: price.recurring,
             active: price.active,
+            metadata: price.metadata,
           }))
       }));
 
@@ -2781,6 +2782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mode: 'payment',
         success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/checkout/cancel`,
+        allow_promotion_codes: true,
         metadata: {
           userId: userId,
         },

@@ -7,16 +7,27 @@ import { Button } from "@/components/ui/button";
 import { GraduationCap, BookOpen, CreditCard, Check, Loader2, Upload, Users, BarChart3, FolderTree, Sparkles, ArrowRight } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
+interface StripePrice {
+  id: string;
+  unit_amount: number;
+  currency: string;
+  recurring: { interval: string } | null;
+  metadata?: {
+    duration_months?: string;
+    plan_type?: string;
+    display_name?: string;
+  };
+}
+
 interface StripeProduct {
   id: string;
   name: string;
   description: string;
-  prices: Array<{
-    id: string;
-    unit_amount: number;
-    currency: string;
-    recurring: { interval: string } | null;
-  }>;
+  metadata?: {
+    type?: string;
+    duration_months?: string;
+  };
+  prices: StripePrice[];
 }
 
 export default function RoleSelection() {
@@ -36,24 +47,27 @@ export default function RoleSelection() {
 
   const products: StripeProduct[] = productsData?.products || [];
   
-  // Find both 4-month and 12-month products
-  const fourMonthProduct = products.find(p => 
-    p.name?.toLowerCase().includes("4 month") || 
-    (p as any).metadata?.duration_months === "4"
-  );
-  const twelveMonthProduct = products.find(p => 
-    p.name?.toLowerCase().includes("12 month") || 
-    (p as any).metadata?.duration_months === "12"
-  );
-  
-  // Fallback to generic student access product
-  const fallbackProduct = products.find(p => 
+  // Find the student access product
+  const studentProduct = products.find(p => 
     p.name?.toLowerCase().includes("student") || 
-    (p as any).metadata?.type === "student_access"
+    p.metadata?.type === "student_access"
   );
   
-  const fourMonthPrice = fourMonthProduct?.prices?.[0] || fallbackProduct?.prices?.[0];
-  const twelveMonthPrice = twelveMonthProduct?.prices?.[0];
+  // Find prices by their metadata or amount
+  // $40 = 4000 cents for 4-month, $90 = 9000 cents for 12-month
+  const allPrices = studentProduct?.prices || [];
+  
+  const fourMonthPrice = allPrices.find(p => 
+    p.metadata?.duration_months === "4" || 
+    p.metadata?.plan_type === "semester" ||
+    p.unit_amount === 4000
+  );
+  
+  const twelveMonthPrice = allPrices.find(p => 
+    p.metadata?.duration_months === "12" || 
+    p.metadata?.plan_type === "annual" ||
+    p.unit_amount === 9000
+  );
 
   const setRoleMutation = useMutation({
     mutationFn: async (role: "professor" | "student") => {

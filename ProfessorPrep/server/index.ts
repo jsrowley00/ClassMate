@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initStripe } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import { ensureStripeProductsExist } from "./seed-stripe-products";
 
 const app = express();
 
@@ -15,6 +16,11 @@ console.log('STRIPE_PUBLISHABLE_KEY present:', !!process.env.STRIPE_PUBLISHABLE_
 console.log('CLERK_PUBLISHABLE_KEY present:', !!process.env.CLERK_PUBLISHABLE_KEY);
 console.log('CLERK_SECRET_KEY present:', !!process.env.CLERK_SECRET_KEY);
 
+function isReplitEnvironment() {
+  return !!(process.env.REPLIT_CONNECTORS_HOSTNAME && 
+    (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL));
+}
+
 async function startStripe() {
   const databaseUrl = process.env.DATABASE_URL;
 
@@ -23,7 +29,10 @@ async function startStripe() {
     return;
   }
 
-  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_PUBLISHABLE_KEY) {
+  const hasEnvKeys = process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY;
+  const hasReplitConnector = isReplitEnvironment();
+
+  if (!hasEnvKeys && !hasReplitConnector) {
     console.warn('Stripe keys not found - skipping Stripe initialization');
     return;
   }
@@ -32,6 +41,9 @@ async function startStripe() {
     console.log('Initializing Stripe...');
     await initStripe();
     console.log('Stripe initialized successfully');
+    
+    console.log('Ensuring Stripe products exist...');
+    await ensureStripeProductsExist();
   } catch (error) {
     console.error('Failed to initialize Stripe (non-fatal):', error);
   }

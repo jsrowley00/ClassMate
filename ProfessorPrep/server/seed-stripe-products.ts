@@ -1,7 +1,7 @@
 import { getUncachableStripeClient } from './stripeClient';
 
-async function createProducts() {
-  console.log('Creating ClassMate student access product in Stripe...');
+export async function ensureStripeProductsExist() {
+  console.log('Checking/creating ClassMate student access products in Stripe...');
   
   const stripe = await getUncachableStripeClient();
 
@@ -9,56 +9,74 @@ async function createProducts() {
     query: "name:'ClassMate Student Access'" 
   });
   
+  let product;
+  
   if (existingProducts.data.length > 0) {
-    console.log('ClassMate Student Access already exists');
-    const product = existingProducts.data[0];
-    
-    const prices = await stripe.prices.list({ product: product.id, active: true });
-    console.log('Existing product:', product.id);
-    console.log('Existing prices:', prices.data.map(p => ({
-      id: p.id,
-      amount: p.unit_amount,
-      type: p.type
-    })));
-    return;
+    product = existingProducts.data[0];
+    console.log('ClassMate Student Access product already exists:', product.id);
+  } else {
+    product = await stripe.products.create({
+      name: 'ClassMate Student Access',
+      description: 'Full access to ClassMate AI-powered study tools including practice tests, flashcards, personalized AI tutoring, and access to any class added during your access period.',
+      metadata: {
+        type: 'student_access',
+        features: 'practice_tests,flashcards,ai_tutor,self_study_rooms,all_classes',
+      },
+    });
+    console.log('Created product:', product.id);
   }
 
-  const product = await stripe.products.create({
-    name: 'ClassMate Student Access',
-    description: '4 months of full access to ClassMate AI-powered study tools including practice tests, flashcards, personalized AI tutoring, and access to any class added during your access period.',
-    metadata: {
-      type: 'student_access',
-      duration_months: '4',
-      features: 'practice_tests,flashcards,ai_tutor,self_study_rooms,all_classes',
-    },
-  });
+  const existingPrices = await stripe.prices.list({ product: product.id, active: true });
+  
+  const has4MonthPrice = existingPrices.data.some(p => 
+    p.unit_amount === 4000 && p.type === 'one_time'
+  );
+  const hasAnnualPrice = existingPrices.data.some(p => 
+    p.unit_amount === 9000 && p.type === 'one_time'
+  );
 
-  console.log('Created product:', product.id);
+  if (!has4MonthPrice) {
+    const semesterPrice = await stripe.prices.create({
+      product: product.id,
+      unit_amount: 4000,
+      currency: 'usd',
+      metadata: {
+        display_name: '4-Month Access',
+        duration_months: '4',
+        plan_type: 'semester',
+      },
+    });
+    console.log('Created 4-month price:', semesterPrice.id, '- $40');
+  } else {
+    console.log('4-month price ($40) already exists');
+  }
 
-  const oneTimePrice = await stripe.prices.create({
-    product: product.id,
-    unit_amount: 4000,
-    currency: 'usd',
-    metadata: {
-      display_name: '4-Month Access',
-      duration_months: '4',
-    },
-  });
+  if (!hasAnnualPrice) {
+    const annualPrice = await stripe.prices.create({
+      product: product.id,
+      unit_amount: 9000,
+      currency: 'usd',
+      metadata: {
+        display_name: 'Annual Access',
+        duration_months: '12',
+        plan_type: 'annual',
+      },
+    });
+    console.log('Created annual price:', annualPrice.id, '- $90');
+  } else {
+    console.log('Annual price ($90) already exists');
+  }
 
-  console.log('Created one-time price:', oneTimePrice.id, '$40 for 4 months');
-
-  console.log('\n--- Summary ---');
-  console.log('Product ID:', product.id);
-  console.log('One-Time Price ID:', oneTimePrice.id);
-  console.log('\nStore these IDs in your environment or code for checkout sessions.');
+  const allPrices = await stripe.prices.list({ product: product.id, active: true });
+  
+  const priceInfo = {
+    productId: product.id,
+    semesterPriceId: allPrices.data.find(p => p.unit_amount === 4000)?.id,
+    annualPriceId: allPrices.data.find(p => p.unit_amount === 9000)?.id,
+  };
+  
+  console.log('Stripe products ready:', priceInfo);
+  
+  return priceInfo;
 }
 
-createProducts()
-  .then(() => {
-    console.log('\nDone!');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('Error creating products:', error);
-    process.exit(1);
-  });

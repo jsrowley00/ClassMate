@@ -1,8 +1,9 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { stripeService } from './stripeService';
 import { db } from './db';
-import { users } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { users, courseEnrollments, courseInvitations } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
+import { storage } from './storage';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string, uuid: string): Promise<void> {
@@ -40,6 +41,29 @@ export class WebhookHandlers {
           const durationMonths = await stripeService.getDurationFromSession(session.id);
           
           await stripeService.activateStudentAccess(user.id, session.payment_intent as string, durationMonths);
+          
+          // Process pending invitations and enrollments now that user has active subscription
+          if (user.email) {
+            try {
+              // Update any pending enrollments to enrolled
+              await db
+                .update(courseEnrollments)
+                .set({ status: "enrolled" })
+                .where(
+                  and(
+                    eq(courseEnrollments.studentId, user.id),
+                    eq(courseEnrollments.status, "pending")
+                  )
+                );
+              console.log(`Updated pending enrollments to enrolled for user ${user.id}`);
+              
+              // Process pending invitations (for courses where they were invited before creating an account)
+              await storage.processPendingInvitations(user.id, user.email);
+              console.log(`Processed pending invitations for user ${user.id}`);
+            } catch (error) {
+              console.error(`Error processing pending enrollments/invitations for user ${user.id}:`, error);
+            }
+          }
         }
       }
     }

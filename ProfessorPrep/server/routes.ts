@@ -169,13 +169,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid role" });
       }
 
-      // Students must pay to sign up - only professors can set role directly
-      // Demo accounts and admin emails bypass subscription requirement
       const existingUser = await storage.getUser(userId);
       const isAdminEmail = existingUser?.email && ADMIN_EMAILS.includes(existingUser.email);
       
       if (role === "student" && !DEMO_ACCOUNT_IDS.includes(userId) && !isAdminEmail) {
-        // Check if user has an active subscription
+        // Check if user has an active subscription to switch to student
         if (!existingUser?.subscriptionStatus || existingUser.subscriptionStatus !== 'active') {
           return res.status(403).json({ 
             message: "Students must subscribe to access ClassMate. Please complete the payment process.",
@@ -184,10 +182,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const user = await storage.upsertUser({
-        id: userId,
-        role,
-      });
+      if (role === "professor" && !DEMO_ACCOUNT_IDS.includes(userId) && !isAdminEmail) {
+        // Check if user has professor access to switch back to professor
+        if (!existingUser?.hasProfessorAccess) {
+          return res.status(403).json({ 
+            message: "You don't have professor access. Please sign up as a professor first."
+          });
+        }
+      }
+
+      // If setting professor role, also grant professor access permanently
+      const updateData: any = { id: userId, role };
+      if (role === "professor") {
+        updateData.hasProfessorAccess = true;
+      }
+
+      const user = await storage.upsertUser(updateData);
 
       res.json(user);
     } catch (error) {

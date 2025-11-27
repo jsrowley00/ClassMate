@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role"), // "professor" or "student" - null means role not yet selected
+  hasProfessorAccess: boolean("has_professor_access").default(false), // True if user signed up as professor (allows switching back)
   stripeCustomerId: varchar("stripe_customer_id"),
   stripePaymentId: varchar("stripe_payment_id"), // One-time payment ID
   subscriptionStatus: varchar("subscription_status"), // "active", "expired", etc.

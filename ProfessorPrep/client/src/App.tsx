@@ -97,7 +97,13 @@ function Router() {
                 <header className="flex items-center justify-between p-4 border-b flex-shrink-0">
                   <SidebarTrigger data-testid="button-sidebar-toggle" />
                   <div className="flex items-center gap-3">
-                    <RoleSwitcher currentRole="professor" userId={user?.id} />
+                    <RoleSwitcher 
+                      currentRole="professor" 
+                      userId={user?.id}
+                      email={user?.email}
+                      hasProfessorAccess={user?.hasProfessorAccess}
+                      subscriptionStatus={user?.subscriptionStatus}
+                    />
                     <ThemeToggle />
                     <UserButton afterSignOutUrl="/" />
                   </div>
@@ -133,7 +139,13 @@ function Router() {
                 <header className="flex items-center justify-between p-4 border-b flex-shrink-0">
                   <SidebarTrigger data-testid="button-sidebar-toggle" />
                   <div className="flex items-center gap-3">
-                    <RoleSwitcher currentRole="student" userId={user?.id} />
+                    <RoleSwitcher 
+                      currentRole="student" 
+                      userId={user?.id}
+                      email={user?.email}
+                      hasProfessorAccess={user?.hasProfessorAccess}
+                      subscriptionStatus={user?.subscriptionStatus}
+                    />
                     <ThemeToggle />
                     <UserButton afterSignOutUrl="/" />
                   </div>

@@ -5,13 +5,23 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const DEMO_ACCOUNT_IDS = ["49754447"];
+const ADMIN_EMAILS = ["jsrowley00@gmail.com"];
 
 interface RoleSwitcherProps {
   currentRole: "professor" | "student";
   userId?: string;
+  email?: string | null;
+  hasProfessorAccess?: boolean | null;
+  subscriptionStatus?: string | null;
 }
 
-export function RoleSwitcher({ currentRole, userId }: RoleSwitcherProps) {
+export function RoleSwitcher({ 
+  currentRole, 
+  userId, 
+  email,
+  hasProfessorAccess,
+  subscriptionStatus 
+}: RoleSwitcherProps) {
   const { toast } = useToast();
   const newRole = currentRole === "professor" ? "student" : "professor";
 
@@ -38,7 +48,19 @@ export function RoleSwitcher({ currentRole, userId }: RoleSwitcherProps) {
     },
   });
 
-  if (!userId || !DEMO_ACCOUNT_IDS.includes(userId)) {
+  // Determine if user can switch roles
+  const isDemoAccount = userId && DEMO_ACCOUNT_IDS.includes(userId);
+  const isAdminEmail = email && ADMIN_EMAILS.includes(email);
+  const hasActiveSubscription = subscriptionStatus === 'active';
+  
+  // Professor can switch to student if they have an active subscription
+  const professorCanSwitchToStudent = currentRole === "professor" && hasActiveSubscription;
+  // Student can switch to professor if they have professor access
+  const studentCanSwitchToProfessor = currentRole === "student" && hasProfessorAccess;
+  
+  const canSwitch = isDemoAccount || isAdminEmail || professorCanSwitchToStudent || studentCanSwitchToProfessor;
+
+  if (!canSwitch) {
     return null;
   }
 

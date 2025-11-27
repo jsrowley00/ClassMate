@@ -2681,7 +2681,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const paymentId = session.payment_intent as string;
       
-      const user = await stripeService.activateStudentAccess(userId, paymentId);
+      // Get the duration from the session/product metadata
+      const durationMonths = await stripeService.getDurationFromSession(sessionId);
+      
+      const user = await stripeService.activateStudentAccess(userId, paymentId, durationMonths);
 
       res.json({ 
         success: true, 

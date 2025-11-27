@@ -117,9 +117,9 @@ export class StripeService {
     return user;
   }
 
-  async activateStudentAccess(userId: string, paymentId: string) {
+  async activateStudentAccess(userId: string, paymentId: string, durationMonths: number = 4) {
     const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + 4);
+    expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
     
     const [user] = await db.update(users).set({
       stripePaymentId: paymentId,
@@ -129,6 +129,32 @@ export class StripeService {
     }).where(eq(users.id, userId)).returning();
     
     return user;
+  }
+
+  async getDurationFromSession(sessionId: string): Promise<number> {
+    const stripe = await getUncachableStripeClient();
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['line_items.data.price.product'],
+    });
+    
+    const lineItem = session.line_items?.data[0];
+    if (lineItem?.price?.product && typeof lineItem.price.product !== 'string') {
+      const product = lineItem.price.product as any;
+      const durationStr = product.metadata?.duration_months;
+      if (durationStr) {
+        return parseInt(durationStr, 10);
+      }
+    }
+    
+    // Also check price metadata
+    if (lineItem?.price?.metadata) {
+      const durationStr = (lineItem.price.metadata as any)?.duration_months;
+      if (durationStr) {
+        return parseInt(durationStr, 10);
+      }
+    }
+    
+    return 4; // Default to 4 months
   }
 
   async checkAccessValid(userId: string): Promise<boolean> {

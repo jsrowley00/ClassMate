@@ -34,14 +34,25 @@ export default function RoleSelection() {
   });
 
   const products: StripeProduct[] = productsData?.products || [];
-  const studentAccess = products.find(p => 
-    p.name?.toLowerCase().includes("student") || 
-    (p as any).metadata?.type === "student_access" ||
-    (p as any).metadata?.type === "student_subscription"
+  
+  // Find both 4-month and 12-month products
+  const fourMonthProduct = products.find(p => 
+    p.name?.toLowerCase().includes("4 month") || 
+    (p as any).metadata?.duration_months === "4"
   );
-  const oneTimePrice = studentAccess?.prices?.find(p => 
-    !p.recurring
-  ) || studentAccess?.prices?.[0];
+  const twelveMonthProduct = products.find(p => 
+    p.name?.toLowerCase().includes("12 month") || 
+    (p as any).metadata?.duration_months === "12"
+  );
+  
+  // Fallback to generic student access product
+  const fallbackProduct = products.find(p => 
+    p.name?.toLowerCase().includes("student") || 
+    (p as any).metadata?.type === "student_access"
+  );
+  
+  const fourMonthPrice = fourMonthProduct?.prices?.[0] || fallbackProduct?.prices?.[0];
+  const twelveMonthPrice = twelveMonthProduct?.prices?.[0];
 
   const setRoleMutation = useMutation({
     mutationFn: async (role: "professor" | "student") => {
@@ -100,9 +111,9 @@ export default function RoleSelection() {
     setShowPayment(true);
   };
 
-  const handleStartPayment = () => {
-    if (oneTimePrice) {
-      createCheckoutMutation.mutate(oneTimePrice.id);
+  const handleStartPayment = (priceId: string) => {
+    if (priceId) {
+      createCheckoutMutation.mutate(priceId);
     }
   };
 
@@ -116,7 +127,7 @@ export default function RoleSelection() {
   if (showPayment) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="max-w-md w-full">
+        <div className="max-w-4xl w-full">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-2 mb-4">
               <GraduationCap className="h-10 w-10 text-primary" />
@@ -124,87 +135,147 @@ export default function RoleSelection() {
             </div>
             <h1 className="text-2xl font-bold mb-2">Get Student Access</h1>
             <p className="text-muted-foreground">
-              $10/month, billed in 4-month increments
+              Choose the plan that works best for you
             </p>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>4-Month Student Access</span>
-                {oneTimePrice && (
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>4-Month Access</span>
                   <span className="text-primary text-2xl font-bold">
                     $10/mo
                   </span>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Billed as {oneTimePrice ? formatPrice(oneTimePrice.unit_amount, oneTimePrice.currency) : '$40'} every 4 months
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>AI-generated practice tests</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>Smart flashcard creation</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>Personal AI tutor for every course</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>Unlimited self-study rooms</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>Access to all classes added during your period</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>Progress tracking & mastery analytics</span>
-                </li>
-              </ul>
+                </CardTitle>
+                <CardDescription>
+                  Billed as {fourMonthPrice ? formatPrice(fourMonthPrice.unit_amount, fourMonthPrice.currency) : '$40'} every 4 months
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3 mb-6">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>AI-generated practice tests</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>Smart flashcard creation</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>Personal AI tutor for every course</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>Unlimited self-study rooms</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>Progress tracking & analytics</span>
+                  </li>
+                </ul>
 
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleStartPayment}
-                disabled={createCheckoutMutation.isPending || !oneTimePrice}
-              >
-                {createCheckoutMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirecting to checkout...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Get Access - $10/month
-                  </>
-                )}
-              </Button>
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={() => fourMonthPrice && handleStartPayment(fourMonthPrice.id)}
+                  disabled={createCheckoutMutation.isPending || !fourMonthPrice}
+                >
+                  {createCheckoutMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Redirecting...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Get 4-Month Access
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
 
-              <Button
-                variant="ghost"
-                className="w-full mt-3"
-                onClick={() => {
-                  setShowPayment(false);
-                  setSelectedRole(null);
-                }}
-              >
-                Back to role selection
-              </Button>
-            </CardContent>
-          </Card>
+            <Card className="border-primary ring-2 ring-primary relative">
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-medium">
+                Best Value
+              </div>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>12-Month Access</span>
+                  <span className="text-primary text-2xl font-bold">
+                    $7.50/mo
+                  </span>
+                </CardTitle>
+                <CardDescription>
+                  Billed as {twelveMonthPrice ? formatPrice(twelveMonthPrice.unit_amount, twelveMonthPrice.currency) : '$90'} once per year
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3 mb-6">
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>AI-generated practice tests</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>Smart flashcard creation</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>Personal AI tutor for every course</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>Unlimited self-study rooms</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>Progress tracking & analytics</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-5 w-5 text-primary font-medium" />
+                    <span className="text-primary font-medium">Save 25% vs monthly</span>
+                  </li>
+                </ul>
 
-          <p className="text-center text-xs text-muted-foreground mt-4">
-            Secure payment powered by Stripe. Billed every 4 months.
-          </p>
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={() => twelveMonthPrice && handleStartPayment(twelveMonthPrice.id)}
+                  disabled={createCheckoutMutation.isPending || !twelveMonthPrice}
+                >
+                  {createCheckoutMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Redirecting...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Get 12-Month Access
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowPayment(false);
+                setSelectedRole(null);
+              }}
+            >
+              Back to role selection
+            </Button>
+            <p className="text-xs text-muted-foreground mt-4">
+              Secure payment powered by Stripe
+            </p>
+          </div>
         </div>
       </div>
     );

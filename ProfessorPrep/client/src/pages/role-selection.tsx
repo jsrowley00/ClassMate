@@ -219,7 +219,7 @@ export default function RoleSelection() {
                     <GraduationCap className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">AI Study Tools for Students</h3>
+                    <h3 className="font-semibold mb-1">AI-Enhanced Study Support for Students</h3>
                     <p className="text-sm text-muted-foreground">
                       Your students get AI practice tests, flashcards, and a personal tutor - all based on your materials.
                     </p>

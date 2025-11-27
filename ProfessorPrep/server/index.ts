@@ -1,10 +1,19 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { initStripe, getStripeClient } from "./stripeClient";
+import { initStripe } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 
 const app = express();
+
+console.log('=== Server starting ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('DATABASE_URL present:', !!process.env.DATABASE_URL);
+console.log('STRIPE_SECRET_KEY present:', !!process.env.STRIPE_SECRET_KEY);
+console.log('STRIPE_PUBLISHABLE_KEY present:', !!process.env.STRIPE_PUBLISHABLE_KEY);
+console.log('CLERK_PUBLISHABLE_KEY present:', !!process.env.CLERK_PUBLISHABLE_KEY);
+console.log('CLERK_SECRET_KEY present:', !!process.env.CLERK_SECRET_KEY);
 
 async function startStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -14,16 +23,19 @@ async function startStripe() {
     return;
   }
 
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_PUBLISHABLE_KEY) {
+    console.warn('Stripe keys not found - skipping Stripe initialization');
+    return;
+  }
+
   try {
     console.log('Initializing Stripe...');
     await initStripe();
     console.log('Stripe initialized successfully');
   } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
+    console.error('Failed to initialize Stripe (non-fatal):', error);
   }
 }
-
-startStripe().catch(err => console.error('Stripe init error:', err));
 
 app.post(
   '/api/stripe/webhook',
@@ -124,28 +136,47 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  try {
+    console.log('Starting server initialization...');
+    
+    // Initialize Stripe (non-blocking)
+    startStripe().catch(err => console.error('Stripe init error:', err));
+    
+    console.log('Registering routes...');
+    const server = await registerRoutes(app);
+    console.log('Routes registered');
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
-  });
+      res.status(status).json({ message });
+      console.error('Express error:', err);
+    });
 
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+    if (app.get("env") === "development") {
+      console.log('Setting up Vite for development...');
+      await setupVite(app, server);
+    } else {
+      console.log('Setting up static file serving for production...');
+      serveStatic(app);
+      console.log('Static file serving configured');
+    }
+
+    const port = parseInt(process.env.PORT || '5000', 10);
+    console.log(`Attempting to listen on port ${port}...`);
+    
+    server.listen({
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, () => {
+      log(`serving on port ${port}`);
+      console.log(`=== Server successfully started on port ${port} ===`);
+    });
+  } catch (error) {
+    console.error('=== FATAL: Server failed to start ===');
+    console.error(error);
+    process.exit(1);
   }
-
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
 })();

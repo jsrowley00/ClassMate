@@ -2,10 +2,35 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Mail, User, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Mail, User, Calendar, BookOpen, Check, Loader2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function StudentProfile() {
   const { user } = useAuth();
+  const { toast } = useToast();
+
+  const becomeProfessorMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/auth/become-professor");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "Professor Access Granted",
+        description: "You can now switch to Professor view using the button in the header.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to enable professor access",
+        variant: "destructive",
+      });
+    },
+  });
 
   if (!user) {
     return null;
@@ -91,6 +116,71 @@ export default function StudentProfile() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Professor Access Card */}
+      {!user.hasProfessorAccess && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Professor Access
+            </CardTitle>
+            <CardDescription>
+              Want to create courses and share materials with students? Become a professor for free!
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  Create unlimited courses
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  Upload study materials
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  Manage student enrollments
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  Keep your student access too
+                </li>
+              </ul>
+              <Button 
+                onClick={() => becomeProfessorMutation.mutate()}
+                disabled={becomeProfessorMutation.isPending}
+              >
+                {becomeProfessorMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <BookOpen className="h-4 w-4 mr-2" />
+                )}
+                Become a Professor (Free)
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {user.hasProfessorAccess && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Professor Access
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-green-600">
+              <Check className="h-5 w-5" />
+              <span>You have professor access! Use the "Switch to Professor" button in the header to access your professor dashboard.</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

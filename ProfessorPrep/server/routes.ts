@@ -206,6 +206,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Become a professor (grant professor access without switching role)
+  app.post('/api/auth/become-professor', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.upsertUser({
+        id: userId,
+        hasProfessorAccess: true,
+      });
+
+      res.json(user);
+    } catch (error) {
+      console.error("Error becoming professor:", error);
+      res.status(500).json({ message: "Failed to enable professor access" });
+    }
+  });
+
   // Course routes
   app.get('/api/courses', isAuthenticated, async (req: any, res) => {
     try {

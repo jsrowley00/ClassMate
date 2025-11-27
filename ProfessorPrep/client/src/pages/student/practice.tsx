@@ -44,7 +44,7 @@ export default function PracticeTest() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/sign-in";
       }, 500);
     }
   }, [isAuthenticated, authLoading, toast]);
@@ -93,7 +93,7 @@ export default function PracticeTest() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/sign-in";
         }, 500);
         return;
       }
@@ -126,7 +126,7 @@ export default function PracticeTest() {
           variant: "destructive",
         });
         setTimeout(() => {
-          window.location.href = "/api/login";
+          window.location.href = "/sign-in";
         }, 500);
         return;
       }

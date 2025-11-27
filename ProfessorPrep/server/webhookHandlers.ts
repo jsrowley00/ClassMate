@@ -35,7 +35,11 @@ export class WebhookHandlers {
         
         if (user) {
           console.log(`Activating student access for user ${user.id} after payment`);
-          await stripeService.activateStudentAccess(user.id, session.payment_intent as string);
+          
+          // Get the correct duration from the session
+          const durationMonths = await stripeService.getDurationFromSession(session.id);
+          
+          await stripeService.activateStudentAccess(user.id, session.payment_intent as string, durationMonths);
         }
       }
     }

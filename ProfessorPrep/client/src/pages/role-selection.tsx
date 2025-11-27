@@ -161,7 +161,7 @@ export default function RoleSelection() {
                   <div>
                     <h3 className="font-semibold mb-1">Organize Course Materials</h3>
                     <p className="text-sm text-muted-foreground">
-                      Create courses with flexible modules and sub-modules. Structure your content exactly how you teach it.
+                      Structure content with modules and sub-modules.
                     </p>
                   </div>
                 </div>
@@ -173,7 +173,7 @@ export default function RoleSelection() {
                   <div>
                     <h3 className="font-semibold mb-1">Upload Any Material</h3>
                     <p className="text-sm text-muted-foreground">
-                      PDFs, Word docs, PowerPoints, images - upload your existing materials and let AI do the rest.
+                      PDFs, Word docs, PowerPoints, and images supported.
                     </p>
                   </div>
                 </div>
@@ -185,7 +185,7 @@ export default function RoleSelection() {
                   <div>
                     <h3 className="font-semibold mb-1">AI-Generated Learning Objectives</h3>
                     <p className="text-sm text-muted-foreground">
-                      Automatically generate SMART learning objectives from your materials to guide student learning.
+                      Auto-generate objectives from your materials.
                     </p>
                   </div>
                 </div>
@@ -197,7 +197,7 @@ export default function RoleSelection() {
                   <div>
                     <h3 className="font-semibold mb-1">Easy Student Enrollment</h3>
                     <p className="text-sm text-muted-foreground">
-                      Share a simple course code and students can join instantly. No complicated setup required.
+                      Share a course code and students join instantly.
                     </p>
                   </div>
                 </div>
@@ -209,7 +209,7 @@ export default function RoleSelection() {
                   <div>
                     <h3 className="font-semibold mb-1">Student Progress Analytics</h3>
                     <p className="text-sm text-muted-foreground">
-                      See which concepts students are struggling with and where they're excelling.
+                      Track where students excel and struggle.
                     </p>
                   </div>
                 </div>
@@ -221,7 +221,7 @@ export default function RoleSelection() {
                   <div>
                     <h3 className="font-semibold mb-1">AI-Enhanced Study Support for Students</h3>
                     <p className="text-sm text-muted-foreground">
-                      Your students get AI practice tests, flashcards, and a personal tutor - all based on your materials.
+                      Practice tests, flashcards, and AI tutoring included.
                     </p>
                   </div>
                 </div>

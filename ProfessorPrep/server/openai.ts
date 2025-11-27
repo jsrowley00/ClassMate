@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import { logAiUsage } from "./aiUsageLogger";
 
 // Using GPT-4o-mini for faster and cheaper token usage as requested by the user
 // This is using OpenAI's API directly with your own API key.
@@ -27,7 +28,8 @@ export async function generatePracticeTest(
   materialContent: string,
   testMode: string,
   questionCount: number = 10,
-  learningObjectives: string[] = []
+  learningObjectives: string[] = [],
+  userId?: string
 ): Promise<Question[]> {
   let objectivesSection = "";
   if (learningObjectives.length > 0) {
@@ -75,6 +77,10 @@ For mixed mode, vary both the question types AND the topics covered.`;
       response_format: { type: "json_object" },
       max_completion_tokens: 8192,
     });
+
+    if (response.usage) {
+      logAiUsage(userId || null, "practice_test", response.usage.prompt_tokens, response.usage.completion_tokens);
+    }
 
     const content = response.choices[0].message.content;
     if (!content) {
@@ -342,7 +348,8 @@ export interface FlashcardItem {
 export async function generateFlashcards(
   materialContent: string,
   cardCount: number = 20,
-  learningObjectives: string[] = []
+  learningObjectives: string[] = [],
+  userId?: string
 ): Promise<FlashcardItem[]> {
   let objectivesSection = "";
   if (learningObjectives.length > 0) {
@@ -389,6 +396,10 @@ Return your response as a JSON array of flashcards. Each flashcard should have:
       max_completion_tokens: 8192,
     });
 
+    if (response.usage) {
+      logAiUsage(userId || null, "flashcards", response.usage.prompt_tokens, response.usage.completion_tokens);
+    }
+
     const content = response.choices[0].message.content;
     if (!content) {
       throw new Error("No content in response");
@@ -411,7 +422,8 @@ export async function generateTutorResponse(
   conversationHistory: { role: string; content: string }[] = [],
   missedQuestions: { question: string; studentAnswer: string; correctAnswer: string }[] = [],
   learningObjectives: string[] = [],
-  masteryRecords: any[] = []
+  masteryRecords: any[] = [],
+  userId?: string
 ): Promise<string> {
   try {
     let learningObjectivesSection = "";
@@ -593,6 +605,10 @@ ${materialContent}${missedQuestionsContext}`,
       max_completion_tokens: 8192,
     });
 
+    if (response.usage) {
+      logAiUsage(userId || null, "tutor", response.usage.prompt_tokens, response.usage.completion_tokens);
+    }
+
     return response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
   } catch (error) {
     console.error("Error generating tutor response:", error);
@@ -767,7 +783,8 @@ export async function generateGlobalTutorResponse(
     developing: number;
     masteryRecords: any[];
     learningObjectives: any[];
-  }>
+  }>,
+  userId?: string
 ): Promise<string> {
   // Build cross-course summary
   const crossCourseSummary = crossCourseMastery.map(course => {
@@ -853,6 +870,10 @@ COMMUNICATION STYLE:
       ],
       temperature: 0.7,
     });
+
+    if (response.usage) {
+      logAiUsage(userId || null, "global_tutor", response.usage.prompt_tokens, response.usage.completion_tokens);
+    }
 
     return response.choices[0].message.content?.trim() || "I'm having trouble generating a response. Please try again.";
   } catch (error) {

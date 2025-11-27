@@ -1132,7 +1132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         learningObjectives = Array.from(new Set(allObjectives));
       }
 
-      const questions = await generatePracticeTest(combinedContent, testMode, questionCount, learningObjectives);
+      const questions = await generatePracticeTest(combinedContent, testMode, questionCount, learningObjectives, userId);
 
       if (!questions || questions.length === 0) {
         return res.status(500).json({ message: "Failed to generate practice questions. Please try again." });
@@ -2138,7 +2138,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conversationHistory,
         recentMissedQuestions,
         learningObjectives,
-        sortedMasteryRecords
+        sortedMasteryRecords,
+        userId
       );
 
       // Save AI message
@@ -2303,7 +2304,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const aiResponse = await generateGlobalTutorResponse(
         message.trim(),
         conversationHistory,
-        crossCourseMastery
+        crossCourseMastery,
+        userId
       );
 
       // Save AI message
@@ -2411,7 +2413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate flashcards using AI
       const { generateFlashcards } = await import('./openai');
-      const flashcardItems = await generateFlashcards(combinedContent, cardCount, learningObjectives);
+      const flashcardItems = await generateFlashcards(combinedContent, cardCount, learningObjectives, userId);
 
       if (!flashcardItems || flashcardItems.length === 0) {
         return res.status(500).json({ message: "Failed to generate flashcards. Please try again." });

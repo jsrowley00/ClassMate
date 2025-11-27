@@ -1,4 +1,4 @@
-import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles, ChevronDown, MessageSquarePlus, MessageSquare, Bot, FolderOpen } from "lucide-react";
+import { BookOpen, Home, Upload, LogOut, GraduationCap, Sparkles, ChevronDown, MessageSquarePlus, MessageSquare, Bot, FolderOpen, ArrowLeftRight } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -19,9 +19,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useClerk } from "@clerk/clerk-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Course } from "@shared/schema";
+
+const ADMIN_EMAIL = "jsrowley00@gmail.com";
 
 export function ProfessorSidebar() {
   const [location] = useLocation();
@@ -31,6 +34,18 @@ export function ProfessorSidebar() {
   const handleSignOut = () => {
     signOut({ redirectUrl: "/" });
   };
+
+  const switchRoleMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/auth/set-role", { role: "student" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      window.location.href = "/";
+    },
+  });
+
+  const isAdmin = user?.email === ADMIN_EMAIL;
 
   const menuItems = [
     {
@@ -93,6 +108,18 @@ export function ProfessorSidebar() {
             </div>
           </div>
         </Link>
+        {isAdmin && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full mb-2" 
+            onClick={() => switchRoleMutation.mutate()}
+            disabled={switchRoleMutation.isPending}
+          >
+            <ArrowLeftRight className="h-4 w-4 mr-2" />
+            {switchRoleMutation.isPending ? "Switching..." : "Switch to Student"}
+          </Button>
+        )}
         <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut} data-testid="button-logout">
           <LogOut className="h-4 w-4 mr-2" />
           Sign Out
@@ -110,6 +137,18 @@ export function StudentSidebar() {
   const handleSignOut = () => {
     signOut({ redirectUrl: "/" });
   };
+
+  const switchRoleMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/auth/set-role", { role: "professor" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      window.location.href = "/";
+    },
+  });
+
+  const isAdmin = user?.email === ADMIN_EMAIL;
 
   // Only fetch data if user is authenticated AND has student role
   const shouldFetch = isAuthenticated && isStudent;
@@ -332,6 +371,18 @@ export function StudentSidebar() {
             </div>
           </div>
         </Link>
+        {isAdmin && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full mb-2" 
+            onClick={() => switchRoleMutation.mutate()}
+            disabled={switchRoleMutation.isPending}
+          >
+            <ArrowLeftRight className="h-4 w-4 mr-2" />
+            {switchRoleMutation.isPending ? "Switching..." : "Switch to Professor"}
+          </Button>
+        )}
         <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut} data-testid="button-logout">
           <LogOut className="h-4 w-4 mr-2" />
           Sign Out

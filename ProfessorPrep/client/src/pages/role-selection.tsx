@@ -148,7 +148,7 @@ export default function RoleSelection() {
             <CardHeader className="text-center pb-2">
               <div className="inline-flex items-center justify-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-4 py-2 rounded-full mx-auto mb-4">
                 <Check className="h-5 w-5" />
-                <span className="font-semibold">Always Free for Professors</span>
+                <span className="font-semibold">Free for Professors, by Design.</span>
               </div>
               <CardTitle className="text-xl">Everything You Need to Empower Your Students</CardTitle>
             </CardHeader>

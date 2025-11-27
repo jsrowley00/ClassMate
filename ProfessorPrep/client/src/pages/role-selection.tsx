@@ -297,12 +297,12 @@ export default function RoleSelection() {
 
         <div className="grid md:grid-cols-2 gap-6">
           <Card
-            className={`cursor-pointer transition-all hover-elevate ${
+            className={`cursor-pointer transition-all hover-elevate flex flex-col ${
               selectedRole === "professor" ? "border-primary ring-2 ring-primary" : ""
             }`}
             onClick={handleProfessorSelect}
           >
-            <CardHeader className="text-center">
+            <CardHeader className="text-center flex-1">
               <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <BookOpen className="h-8 w-8 text-primary" />
               </div>
@@ -311,7 +311,7 @@ export default function RoleSelection() {
                 Create and manage courses for your students
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <Button
                 className="w-full"
                 disabled={setRoleMutation.isPending}
@@ -325,12 +325,12 @@ export default function RoleSelection() {
           </Card>
 
           <Card
-            className={`cursor-pointer transition-all hover-elevate ${
+            className={`cursor-pointer transition-all hover-elevate flex flex-col ${
               selectedRole === "student" ? "border-primary ring-2 ring-primary" : ""
             }`}
             onClick={handleStudentSelect}
           >
-            <CardHeader className="text-center">
+            <CardHeader className="text-center flex-1">
               <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <GraduationCap className="h-8 w-8 text-primary" />
               </div>
@@ -339,7 +339,7 @@ export default function RoleSelection() {
                 Enroll in courses or build your own study rooms to access AI study tools
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <Button
                 className="w-full"
                 disabled={setRoleMutation.isPending}

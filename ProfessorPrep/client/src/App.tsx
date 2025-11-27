@@ -86,108 +86,120 @@ function Router() {
 
   if (isProfessor) {
     return (
-      <SidebarProvider style={sidebarStyle} defaultOpen={false}>
-        <div className="flex h-screen w-full overflow-hidden">
-          <ProfessorSidebar />
-          <div className="flex flex-col flex-1">
-            <header className="flex items-center justify-between p-4 border-b flex-shrink-0">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <div className="flex items-center gap-3">
-                <RoleSwitcher currentRole="professor" userId={user?.id} />
-                <ThemeToggle />
-                <UserButton afterSignOutUrl="/" />
+      <Switch>
+        <Route path="/checkout/success" component={CheckoutSuccess} />
+        <Route path="/checkout/cancel" component={CheckoutCancel} />
+        <Route>
+          <SidebarProvider style={sidebarStyle} defaultOpen={false}>
+            <div className="flex h-screen w-full overflow-hidden">
+              <ProfessorSidebar />
+              <div className="flex flex-col flex-1">
+                <header className="flex items-center justify-between p-4 border-b flex-shrink-0">
+                  <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  <div className="flex items-center gap-3">
+                    <RoleSwitcher currentRole="professor" userId={user?.id} />
+                    <ThemeToggle />
+                    <UserButton afterSignOutUrl="/" />
+                  </div>
+                </header>
+                <main className="flex-1 overflow-auto">
+                  <Switch>
+                    <Route path="/" component={ProfessorDashboard} />
+                    <Route path="/professor/courses" component={ProfessorCourses} />
+                    <Route path="/professor/courses/new" component={CreateCourse} />
+                    <Route path="/professor/courses/:id" component={CourseDetail} />
+                    <Route path="/professor/profile" component={ProfessorProfile} />
+                    <Route component={NotFound} />
+                  </Switch>
+                </main>
               </div>
-            </header>
-            <main className="flex-1 overflow-auto">
-              <Switch>
-                <Route path="/" component={ProfessorDashboard} />
-                <Route path="/professor/courses" component={ProfessorCourses} />
-                <Route path="/professor/courses/new" component={CreateCourse} />
-                <Route path="/professor/courses/:id" component={CourseDetail} />
-                <Route path="/professor/profile" component={ProfessorProfile} />
-                <Route component={NotFound} />
-              </Switch>
-            </main>
-          </div>
-        </div>
-      </SidebarProvider>
+            </div>
+          </SidebarProvider>
+        </Route>
+      </Switch>
     );
   }
 
   if (isStudent) {
     return (
-      <SidebarProvider style={sidebarStyle} defaultOpen={false}>
-        <div className="flex h-screen w-full overflow-hidden">
-          <StudentSidebar />
-          <div className="flex flex-col flex-1">
-            <header className="flex items-center justify-between p-4 border-b flex-shrink-0">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <div className="flex items-center gap-3">
-                <RoleSwitcher currentRole="student" userId={user?.id} />
-                <ThemeToggle />
-                <UserButton afterSignOutUrl="/" />
+      <Switch>
+        <Route path="/checkout/success" component={CheckoutSuccess} />
+        <Route path="/checkout/cancel" component={CheckoutCancel} />
+        <Route>
+          <SidebarProvider style={sidebarStyle} defaultOpen={false}>
+            <div className="flex h-screen w-full overflow-hidden">
+              <StudentSidebar />
+              <div className="flex flex-col flex-1">
+                <header className="flex items-center justify-between p-4 border-b flex-shrink-0">
+                  <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  <div className="flex items-center gap-3">
+                    <RoleSwitcher currentRole="student" userId={user?.id} />
+                    <ThemeToggle />
+                    <UserButton afterSignOutUrl="/" />
+                  </div>
+                </header>
+                <main className="flex-1 overflow-auto">
+                  <Switch>
+                    <Route path="/" component={StudentDashboard} />
+                    <Route path="/student/profile" component={StudentProfile} />
+                    <Route path="/global-tutor/:sessionId?" component={GlobalTutor} />
+                    
+                    {/* Standalone course pages (no tabs) */}
+                    <Route path="/student/courses/:id/enroll" component={EnrollCourse} />
+                    <Route path="/student/courses/:id/flashcards/:setId" component={FlashcardStudy} />
+                    
+                    {/* Course pages with left tabs navigation */}
+                    <Route path="/student/courses/:id">
+                      {() => (
+                        <CourseLayout>
+                          <CourseOverview />
+                        </CourseLayout>
+                      )}
+                    </Route>
+                    <Route path="/student/courses/:id/materials">
+                      {() => (
+                        <CourseLayout>
+                          <CourseMaterials />
+                        </CourseLayout>
+                      )}
+                    </Route>
+                    <Route path="/student/courses/:id/practice">
+                      {() => (
+                        <CourseLayout>
+                          <PracticeTest />
+                        </CourseLayout>
+                      )}
+                    </Route>
+                    <Route path="/student/courses/:id/flashcards">
+                      {() => (
+                        <CourseLayout>
+                          <Flashcards />
+                        </CourseLayout>
+                      )}
+                    </Route>
+                    <Route path="/student/courses/:id/tutor">
+                      {() => (
+                        <CourseLayout>
+                          <AITutor />
+                        </CourseLayout>
+                      )}
+                    </Route>
+                    <Route path="/student/courses/:id/build">
+                      {() => (
+                        <CourseLayout>
+                          <BuildStudyRoom />
+                        </CourseLayout>
+                      )}
+                    </Route>
+                    
+                    <Route component={NotFound} />
+                  </Switch>
+                </main>
               </div>
-            </header>
-            <main className="flex-1 overflow-auto">
-              <Switch>
-                <Route path="/" component={StudentDashboard} />
-                <Route path="/student/profile" component={StudentProfile} />
-                <Route path="/global-tutor/:sessionId?" component={GlobalTutor} />
-                
-                {/* Standalone course pages (no tabs) */}
-                <Route path="/student/courses/:id/enroll" component={EnrollCourse} />
-                <Route path="/student/courses/:id/flashcards/:setId" component={FlashcardStudy} />
-                
-                {/* Course pages with left tabs navigation */}
-                <Route path="/student/courses/:id">
-                  {() => (
-                    <CourseLayout>
-                      <CourseOverview />
-                    </CourseLayout>
-                  )}
-                </Route>
-                <Route path="/student/courses/:id/materials">
-                  {() => (
-                    <CourseLayout>
-                      <CourseMaterials />
-                    </CourseLayout>
-                  )}
-                </Route>
-                <Route path="/student/courses/:id/practice">
-                  {() => (
-                    <CourseLayout>
-                      <PracticeTest />
-                    </CourseLayout>
-                  )}
-                </Route>
-                <Route path="/student/courses/:id/flashcards">
-                  {() => (
-                    <CourseLayout>
-                      <Flashcards />
-                    </CourseLayout>
-                  )}
-                </Route>
-                <Route path="/student/courses/:id/tutor">
-                  {() => (
-                    <CourseLayout>
-                      <AITutor />
-                    </CourseLayout>
-                  )}
-                </Route>
-                <Route path="/student/courses/:id/build">
-                  {() => (
-                    <CourseLayout>
-                      <BuildStudyRoom />
-                    </CourseLayout>
-                  )}
-                </Route>
-                
-                <Route component={NotFound} />
-              </Switch>
-            </main>
-          </div>
-        </div>
-      </SidebarProvider>
+            </div>
+          </SidebarProvider>
+        </Route>
+      </Switch>
     );
   }
 

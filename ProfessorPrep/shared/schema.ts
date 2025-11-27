@@ -83,7 +83,18 @@ export const courseEnrollments = pgTable("course_enrollments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
   studentId: varchar("student_id").notNull().references(() => users.id),
+  status: varchar("status").notNull().default("enrolled"), // "enrolled" or "pending"
   enrolledAt: timestamp("enrolled_at").defaultNow(),
+});
+
+// Course invitations table - for inviting users who haven't signed up yet
+export const courseInvitations = pgTable("course_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  email: varchar("email").notNull(),
+  status: varchar("status").notNull().default("pending"), // "pending" or "accepted"
+  invitedAt: timestamp("invited_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
 });
 
 // Practice tests table
@@ -433,6 +444,14 @@ export const insertCourseEnrollmentSchema = createInsertSchema(courseEnrollments
 });
 export type InsertCourseEnrollment = z.infer<typeof insertCourseEnrollmentSchema>;
 export type CourseEnrollment = typeof courseEnrollments.$inferSelect;
+
+export const insertCourseInvitationSchema = createInsertSchema(courseInvitations).omit({
+  id: true,
+  invitedAt: true,
+  acceptedAt: true,
+});
+export type InsertCourseInvitation = z.infer<typeof insertCourseInvitationSchema>;
+export type CourseInvitation = typeof courseInvitations.$inferSelect;
 
 export const insertPracticeTestSchema = createInsertSchema(practiceTests).omit({
   id: true,

@@ -140,7 +140,7 @@ export default function RoleSelection() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6 mb-6">
-            <Card>
+            <Card className="flex flex-col">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>4-Month Access</span>
@@ -152,8 +152,8 @@ export default function RoleSelection() {
                   Billed as {fourMonthPrice ? formatPrice(fourMonthPrice.unit_amount, fourMonthPrice.currency) : '$40'} every 4 months
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-3 mb-6">
+              <CardContent className="flex-1 flex flex-col">
+                <ul className="space-y-3 mb-6 flex-1">
                   <li className="flex items-center gap-2">
                     <Check className="h-5 w-5 text-green-500" />
                     <span>AI-generated practice tests</span>
@@ -197,7 +197,7 @@ export default function RoleSelection() {
               </CardContent>
             </Card>
 
-            <Card className="border-primary ring-2 ring-primary relative">
+            <Card className="border-primary ring-2 ring-primary relative flex flex-col">
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-medium">
                 Best Value
               </div>
@@ -212,8 +212,8 @@ export default function RoleSelection() {
                   Billed as {twelveMonthPrice ? formatPrice(twelveMonthPrice.unit_amount, twelveMonthPrice.currency) : '$90'} once per year
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-3 mb-6">
+              <CardContent className="flex-1 flex flex-col">
+                <ul className="space-y-3 mb-6 flex-1">
                   <li className="flex items-center gap-2">
                     <Check className="h-5 w-5 text-green-500" />
                     <span>AI-generated practice tests</span>

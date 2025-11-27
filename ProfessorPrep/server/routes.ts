@@ -11,10 +11,37 @@ import mammoth from "mammoth";
 import officeParser from "officeparser";
 import tmp from "tmp";
 import { writeFile, unlink } from "fs/promises";
+import { sendCourseInvitationEmail } from "./email";
+import type { User } from "@shared/schema";
 
 // Demo account IDs that bypass subscription requirements (for testing purposes)
 const DEMO_ACCOUNT_IDS = ["49754447"]; // Jackson Rowley
 const ADMIN_EMAILS = ["jsrowley00@gmail.com"]; // Admin emails that bypass subscription
+
+// Helper function to check if a user has an active student subscription
+function hasActiveStudentSubscription(user: User): boolean {
+  // Admin emails always have access
+  if (user.email && ADMIN_EMAILS.includes(user.email)) {
+    return true;
+  }
+  
+  // Demo accounts always have access
+  if (DEMO_ACCOUNT_IDS.includes(user.id)) {
+    return true;
+  }
+  
+  // Check subscription status and expiration
+  if (user.subscriptionStatus !== 'active') {
+    return false;
+  }
+  
+  if (!user.subscriptionExpiresAt) {
+    return false;
+  }
+  
+  const expiresAt = new Date(user.subscriptionExpiresAt);
+  return expiresAt > new Date();
+}
 
 // Token storage for preview URLs (in production, use Redis or similar)
 const previewTokens = new Map<string, { materialId: string; expiresAt: number }>();
@@ -869,8 +896,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only the course professor can view enrolled students" });
       }
 
-      const students = await storage.getEnrolledStudents(id);
-      res.json(students);
+      // Get enrolled students with their status
+      const studentsWithStatus = await storage.getEnrolledStudentsWithStatus(id);
+      
+      // Also get pending invitations (users who haven't signed up yet)
+      const invitations = await storage.getCourseInvitations(id);
+      const pendingInvitations = invitations
+        .filter(inv => inv.status === "pending")
+        .map(inv => ({
+          id: inv.id,
+          email: inv.email,
+          enrollmentStatus: "invited",
+          invitedAt: inv.invitedAt,
+          isInvitation: true,
+        }));
+
+      res.json({ students: studentsWithStatus, invitations: pendingInvitations });
     } catch (error) {
       console.error("Error fetching enrolled students:", error);
       res.status(500).json({ message: "Failed to fetch enrolled students" });
@@ -896,22 +937,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only the course professor can add students" });
       }
 
-      const student = await storage.getUserByEmail(email);
-      if (!student) {
-        return res.status(404).json({ message: "User not found with this email" });
+      // Get the professor's name for the invitation email
+      const professor = await storage.getUser(userId);
+      const professorName = professor?.firstName && professor?.lastName 
+        ? `${professor.firstName} ${professor.lastName}` 
+        : professor?.email || "Your Professor";
+
+      // Check if user exists
+      const student = await storage.getUserByEmail(email.toLowerCase());
+      
+      if (student) {
+        // User exists - check if already enrolled
+        const existingEnrollment = await storage.getEnrollment(student.id, id);
+        if (existingEnrollment) {
+          return res.status(400).json({ message: "User is already enrolled in this course" });
+        }
+
+        // Check if student has active subscription
+        const hasSubscription = hasActiveStudentSubscription(student);
+        const status = hasSubscription ? "enrolled" : "pending";
+
+        await storage.enrollStudent({
+          courseId: id,
+          studentId: student.id,
+          status,
+        });
+
+        if (!hasSubscription) {
+          // Send invitation email to the student
+          try {
+            const signUpUrl = process.env.REPLIT_DEV_DOMAIN 
+              ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+              : 'https://classmate.study';
+            await sendCourseInvitationEmail(email, course.name, professorName, signUpUrl);
+          } catch (emailError) {
+            console.error("Failed to send invitation email:", emailError);
+            // Continue even if email fails - enrollment is still created
+          }
+        }
+
+        res.status(201).json({ 
+          message: hasSubscription 
+            ? "Student enrolled successfully" 
+            : "Student added with pending status. Invitation email sent.",
+          student: { ...student, enrollmentStatus: status },
+          status,
+        });
+      } else {
+        // User doesn't exist - check if already invited
+        const existingInvitation = await storage.getCourseInvitation(id, email.toLowerCase());
+        if (existingInvitation && existingInvitation.status === "pending") {
+          return res.status(400).json({ message: "An invitation has already been sent to this email" });
+        }
+
+        // Create invitation for non-existent user
+        await storage.createCourseInvitation({
+          courseId: id,
+          email: email.toLowerCase(),
+          status: "pending",
+        });
+
+        // Send invitation email
+        try {
+          const signUpUrl = process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+            : 'https://classmate.study';
+          await sendCourseInvitationEmail(email, course.name, professorName, signUpUrl);
+        } catch (emailError) {
+          console.error("Failed to send invitation email:", emailError);
+          // Continue even if email fails - invitation is still created
+        }
+
+        res.status(201).json({ 
+          message: "Invitation sent to email. Student will be enrolled when they sign up and subscribe.",
+          status: "invited",
+          email: email.toLowerCase(),
+        });
       }
-
-      const alreadyEnrolled = await storage.isEnrolled(student.id, id);
-      if (alreadyEnrolled) {
-        return res.status(400).json({ message: "User is already enrolled in this course" });
-      }
-
-      await storage.enrollStudent({
-        courseId: id,
-        studentId: student.id,
-      });
-
-      res.status(201).json({ message: "Student added successfully", student });
     } catch (error: any) {
       console.error("Error adding student:", error);
       res.status(500).json({ message: error.message || "Failed to add student" });

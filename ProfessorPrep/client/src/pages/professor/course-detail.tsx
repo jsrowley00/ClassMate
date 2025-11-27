@@ -140,10 +140,19 @@ export default function CourseDetail() {
     enabled: isAuthenticated && !!id,
   });
 
-  const { data: students, isLoading: studentsLoading } = useQuery<User[]>({
+  type StudentWithStatus = User & { enrollmentStatus: string };
+  type PendingInvitation = { id: string; email: string; enrollmentStatus: string; invitedAt: Date; isInvitation: boolean };
+  
+  const { data: studentsData, isLoading: studentsLoading } = useQuery<{
+    students: StudentWithStatus[];
+    invitations: PendingInvitation[];
+  }>({
     queryKey: ["/api/courses", id, "students"],
     enabled: isAuthenticated && !!id,
   });
+  
+  const students = studentsData?.students || [];
+  const invitations = studentsData?.invitations || [];
 
   const { data: modules, isLoading: modulesLoading } = useQuery<CourseModule[]>({
     queryKey: ["/api/courses", id, "modules"],
@@ -441,11 +450,19 @@ export default function CourseDetail() {
     mutationFn: async (email: string) => {
       return await apiRequest("POST", `/api/courses/${id}/students`, { email });
     },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Student added successfully",
-      });
+    onSuccess: (data: { message: string; status: string }) => {
+      let title = "Success";
+      let description = data.message;
+      
+      if (data.status === "enrolled") {
+        description = "Student enrolled successfully. They have full access.";
+      } else if (data.status === "pending") {
+        description = "Student added with pending status. An invitation email was sent.";
+      } else if (data.status === "invited") {
+        description = "Invitation sent! Student will be enrolled when they sign up and subscribe.";
+      }
+      
+      toast({ title, description });
       queryClient.invalidateQueries({ queryKey: ["/api/courses", id, "students"] });
       setStudentEmail("");
     },
@@ -1367,7 +1384,7 @@ export default function CourseDetail() {
               <Skeleton className="h-12 w-full" />
               <Skeleton className="h-12 w-full" />
             </div>
-          ) : students && students.length > 0 ? (
+          ) : (students.length > 0 || invitations.length > 0) ? (
             <div className="space-y-2">
               {students.map((student) => (
                 <div
@@ -1378,19 +1395,29 @@ export default function CourseDetail() {
                   <div
                     className="flex-1 cursor-pointer"
                     onClick={() => {
-                      setSelectedStudentId(student.id);
-                      setSelectedStudentName(
-                        student.firstName && student.lastName
-                          ? `${student.firstName} ${student.lastName}`
-                          : (student.email || "Unknown Student")
-                      );
-                      setStudentAnalyticsOpen(true);
+                      if (student.enrollmentStatus === "enrolled") {
+                        setSelectedStudentId(student.id);
+                        setSelectedStudentName(
+                          student.firstName && student.lastName
+                            ? `${student.firstName} ${student.lastName}`
+                            : (student.email || "Unknown Student")
+                        );
+                        setStudentAnalyticsOpen(true);
+                      }
                     }}
                   >
-                    <div className="font-medium hover:text-primary transition-colors">
-                      {student.firstName && student.lastName
-                        ? `${student.firstName} ${student.lastName}`
-                        : student.email}
+                    <div className="flex items-center gap-2">
+                      <span className={`font-medium ${student.enrollmentStatus === "enrolled" ? "hover:text-primary transition-colors" : ""}`}>
+                        {student.firstName && student.lastName
+                          ? `${student.firstName} ${student.lastName}`
+                          : student.email}
+                      </span>
+                      <Badge 
+                        variant={student.enrollmentStatus === "enrolled" ? "default" : "secondary"}
+                        className={student.enrollmentStatus === "enrolled" ? "bg-green-500" : "bg-yellow-500"}
+                      >
+                        {student.enrollmentStatus === "enrolled" ? "Enrolled" : "Pending"}
+                      </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground">{student.email}</div>
                   </div>
@@ -1403,6 +1430,26 @@ export default function CourseDetail() {
                   >
                     <X className="h-4 w-4" />
                   </Button>
+                </div>
+              ))}
+              
+              {invitations.map((invitation) => (
+                <div
+                  key={invitation.id}
+                  className="flex items-center justify-between p-3 border rounded-md bg-muted/30"
+                  data-testid={`invitation-item-${invitation.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground">{invitation.email}</span>
+                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                        Invited
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Waiting for signup • Invited {new Date(invitation.invitedAt).toLocaleDateString()}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

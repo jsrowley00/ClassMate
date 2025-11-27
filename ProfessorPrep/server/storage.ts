@@ -4,6 +4,7 @@ import {
   courseModules,
   courseMaterials,
   courseEnrollments,
+  courseInvitations,
   practiceTests,
   chatSessions,
   chatMessages,
@@ -24,6 +25,8 @@ import {
   type InsertCourseMaterial,
   type CourseEnrollment,
   type InsertCourseEnrollment,
+  type CourseInvitation,
+  type InsertCourseInvitation,
   type PracticeTest,
   type InsertPracticeTest,
   type ChatSession,
@@ -79,10 +82,21 @@ export interface IStorage {
   // Enrollment operations
   getEnrolledCourses(studentId: string): Promise<Course[]>;
   getEnrolledStudents(courseId: string): Promise<User[]>;
+  getEnrolledStudentsWithStatus(courseId: string): Promise<Array<User & { enrollmentStatus: string }>>;
   getAvailableCourses(studentId: string): Promise<Course[]>;
   isEnrolled(studentId: string, courseId: string): Promise<boolean>;
+  getEnrollment(studentId: string, courseId: string): Promise<CourseEnrollment | undefined>;
   enrollStudent(enrollment: InsertCourseEnrollment): Promise<CourseEnrollment>;
+  updateEnrollmentStatus(studentId: string, courseId: string, status: string): Promise<void>;
   unenrollStudent(studentId: string, courseId: string): Promise<void>;
+
+  // Course invitation operations
+  createCourseInvitation(invitation: InsertCourseInvitation): Promise<CourseInvitation>;
+  getCourseInvitation(courseId: string, email: string): Promise<CourseInvitation | undefined>;
+  getCourseInvitations(courseId: string): Promise<CourseInvitation[]>;
+  getPendingInvitationsForEmail(email: string): Promise<Array<CourseInvitation & { course: Course }>>;
+  acceptCourseInvitation(invitationId: string): Promise<void>;
+  processPendingInvitations(userId: string, email: string): Promise<void>;
 
   // Practice test operations
   getPracticeTests(studentId: string, courseId?: string): Promise<PracticeTest[]>;
@@ -408,6 +422,103 @@ export class DatabaseStorage implements IStorage {
           eq(courseEnrollments.courseId, courseId)
         )
       );
+  }
+
+  async getEnrolledStudentsWithStatus(courseId: string): Promise<Array<User & { enrollmentStatus: string }>> {
+    const enrollments = await db
+      .select({ user: users, status: courseEnrollments.status })
+      .from(courseEnrollments)
+      .innerJoin(users, eq(courseEnrollments.studentId, users.id))
+      .where(eq(courseEnrollments.courseId, courseId));
+    return enrollments.map((e) => ({ ...e.user, enrollmentStatus: e.status }));
+  }
+
+  async getEnrollment(studentId: string, courseId: string): Promise<CourseEnrollment | undefined> {
+    const [enrollment] = await db
+      .select()
+      .from(courseEnrollments)
+      .where(
+        and(
+          eq(courseEnrollments.studentId, studentId),
+          eq(courseEnrollments.courseId, courseId)
+        )
+      );
+    return enrollment;
+  }
+
+  async updateEnrollmentStatus(studentId: string, courseId: string, status: string): Promise<void> {
+    await db
+      .update(courseEnrollments)
+      .set({ status })
+      .where(
+        and(
+          eq(courseEnrollments.studentId, studentId),
+          eq(courseEnrollments.courseId, courseId)
+        )
+      );
+  }
+
+  // Course invitation operations
+  async createCourseInvitation(invitation: InsertCourseInvitation): Promise<CourseInvitation> {
+    const [result] = await db.insert(courseInvitations).values(invitation).returning();
+    return result;
+  }
+
+  async getCourseInvitation(courseId: string, email: string): Promise<CourseInvitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(courseInvitations)
+      .where(
+        and(
+          eq(courseInvitations.courseId, courseId),
+          eq(courseInvitations.email, email.toLowerCase())
+        )
+      );
+    return invitation;
+  }
+
+  async getCourseInvitations(courseId: string): Promise<CourseInvitation[]> {
+    return await db
+      .select()
+      .from(courseInvitations)
+      .where(eq(courseInvitations.courseId, courseId));
+  }
+
+  async getPendingInvitationsForEmail(email: string): Promise<Array<CourseInvitation & { course: Course }>> {
+    const results = await db
+      .select({ invitation: courseInvitations, course: courses })
+      .from(courseInvitations)
+      .innerJoin(courses, eq(courseInvitations.courseId, courses.id))
+      .where(
+        and(
+          eq(courseInvitations.email, email.toLowerCase()),
+          eq(courseInvitations.status, "pending")
+        )
+      );
+    return results.map((r) => ({ ...r.invitation, course: r.course }));
+  }
+
+  async acceptCourseInvitation(invitationId: string): Promise<void> {
+    await db
+      .update(courseInvitations)
+      .set({ status: "accepted", acceptedAt: new Date() })
+      .where(eq(courseInvitations.id, invitationId));
+  }
+
+  async processPendingInvitations(userId: string, email: string): Promise<void> {
+    const pendingInvitations = await this.getPendingInvitationsForEmail(email);
+    
+    for (const invitation of pendingInvitations) {
+      const alreadyEnrolled = await this.isEnrolled(userId, invitation.courseId);
+      if (!alreadyEnrolled) {
+        await this.enrollStudent({
+          courseId: invitation.courseId,
+          studentId: userId,
+          status: "enrolled",
+        });
+      }
+      await this.acceptCourseInvitation(invitation.id);
+    }
   }
 
   // Practice test operations

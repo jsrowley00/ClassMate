@@ -243,7 +243,7 @@ export default function RoleSelection() {
                 </>
               ) : (
                 <>
-                  Get Started
+                  Create Your First Course
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               )}

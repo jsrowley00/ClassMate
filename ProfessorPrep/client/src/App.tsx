@@ -49,6 +49,8 @@ import StudentProfile from "@/pages/student/profile";
 import BuildStudyRoom from "@/pages/student/build-study-room";
 import { CourseLayout } from "@/components/course-layout";
 
+import AdminDashboard from "@/pages/admin/dashboard";
+
 function Router() {
   const { isAuthenticated, isLoading, isProfessor, isStudent, user } = useAuth();
 
@@ -115,6 +117,7 @@ function Router() {
                     <Route path="/professor/courses/new" component={CreateCourse} />
                     <Route path="/professor/courses/:id" component={CourseDetail} />
                     <Route path="/professor/profile" component={ProfessorProfile} />
+                    <Route path="/admin" component={AdminDashboard} />
                     <Route component={NotFound} />
                   </Switch>
                 </main>
@@ -204,6 +207,7 @@ function Router() {
                       )}
                     </Route>
                     
+                    <Route path="/admin" component={AdminDashboard} />
                     <Route component={NotFound} />
                   </Switch>
                 </main>

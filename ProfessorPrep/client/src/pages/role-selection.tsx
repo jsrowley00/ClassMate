@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,10 +149,10 @@ export default function RoleSelection() {
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="max-w-4xl w-full">
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-4">
+            <Link href="/" className="inline-flex items-center justify-center gap-2 mb-4 hover:opacity-80 transition-opacity cursor-pointer">
               <BookOpen className="h-10 w-10 text-primary" />
               <span className="text-3xl font-bold">ClassMate</span>
-            </div>
+            </Link>
             <h1 className="text-2xl font-bold mb-2">Welcome, Professor!</h1>
             <p className="text-muted-foreground">
               Effortlessly turn your course materials into AI-powered study tools for your students.
@@ -284,10 +285,10 @@ export default function RoleSelection() {
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="max-w-4xl w-full">
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-4">
+            <Link href="/" className="inline-flex items-center justify-center gap-2 mb-4 hover:opacity-80 transition-opacity cursor-pointer">
               <GraduationCap className="h-10 w-10 text-primary" />
               <span className="text-3xl font-bold">ClassMate</span>
-            </div>
+            </Link>
             <h1 className="text-2xl font-bold mb-2">Get Student Access</h1>
             <p className="text-muted-foreground">
               Choose the plan that works best for you
@@ -440,10 +441,10 @@ export default function RoleSelection() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="max-w-4xl w-full">
         <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-2 mb-4">
+          <Link href="/" className="inline-flex items-center justify-center gap-2 mb-4 hover:opacity-80 transition-opacity cursor-pointer">
             <GraduationCap className="h-12 w-12 text-primary" />
             <span className="text-4xl font-bold">ClassMate</span>
-          </div>
+          </Link>
           <h1 className="text-3xl font-bold mb-2">Welcome! Choose Your Role</h1>
           <p className="text-muted-foreground">
             Select how you'll be using ClassMate

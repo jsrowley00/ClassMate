@@ -1,0 +1,60 @@
+npm ci
+3s
+npm warn config production Use `--omit=dev` instead.
+npm error code EUSAGE
+npm error
+npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync. Please update your lock file with `npm install` before continuing.
+
+npm error
+npm error Missing: @clerk/clerk-react@5.57.0 from lock file
+
+npm error Missing: @clerk/express@1.7.53 from lock file
+
+npm error Missing: @clerk/shared@3.36.0 from lock file
+
+npm error Missing: @clerk/backend@2.24.0 from lock file
+
+npm error Missing: @clerk/types@4.101.3 from lock file
+
+npm error Missing: cookie@1.0.2 from lock file
+
+npm error Missing: standardwebhooks@1.0.0 from lock file
+
+npm error Missing: dequal@2.0.3 from lock file
+
+npm error Missing: glob-to-regexp@0.4.1 from lock file
+
+npm error Missing: js-cookie@3.0.5 from lock file
+
+npm error Missing: std-env@3.10.0 from lock file
+
+npm error Missing: swr@2.3.4 from lock file
+
+npm error Missing: @stablelib/base64@1.0.1 from lock file
+
+npm error Missing: fast-sha256@1.3.0 from lock file
+
+npm error Invalid: lock file's use-sync-external-store@1.2.2 does not satisfy use-sync-external-store@1.6.0
+npm error
+npm error Clean install a project
+npm error
+npm error Usage:
+npm error npm ci
+npm error
+npm error Options:
+npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+npm error [--no-bin-links] [--no-fund] [--dry-run]
+npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+npm error
+npm error aliases: clean-install, ic, install-clean, isntall-clean
+npm error
+npm error Run "npm help ci" for more info
+npm error A complete log of this run can be found in: /root/.npm/_logs/2025-11-27T05_20_56_692Z-debug-0.log
+
+copy /mise/shims, /mise/installs, /usr/local/bin/mise, /etc/mise/config.toml, /root/.local/state/mise
+734ms
+ERROR: failed to build: failed to solve: process "npm ci" did not complete successfully: exit code: 1

@@ -4,7 +4,11 @@ import { BookOpen, FileText, Brain, MessageSquare, LayoutDashboard, Wrench } fro
 import { cn } from "@/lib/utils";
 import type { Course } from "@shared/schema";
 
-export function CourseTabs() {
+interface CourseTabsProps {
+  isCollapsed?: boolean;
+}
+
+export function CourseTabs({ isCollapsed = false }: CourseTabsProps) {
   const { id } = useParams<{ id: string }>();
   const [location] = useLocation();
 
@@ -55,7 +59,7 @@ export function CourseTabs() {
     : baseTabs;
 
   return (
-    <nav className="w-56 border-r bg-muted/20 p-4 space-y-1" data-testid="course-tabs">
+    <nav className="w-56 min-w-56 border-r bg-muted/20 p-4 space-y-1" data-testid="course-tabs">
       <h3 className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
         Course Navigation
       </h3>

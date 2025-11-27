@@ -28,13 +28,24 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
     const clerkUser = await clerkClient.users.getUser(auth.userId);
     
+    const userEmail = clerkUser.emailAddresses[0]?.emailAddress || "";
+    
     await storage.upsertUser({
       id: auth.userId,
-      email: clerkUser.emailAddresses[0]?.emailAddress || "",
+      email: userEmail,
       firstName: clerkUser.firstName || "",
       lastName: clerkUser.lastName || "",
       profileImageUrl: clerkUser.imageUrl || "",
     });
+
+    // Auto-enroll user in courses they were invited to before creating their account
+    if (userEmail) {
+      try {
+        await storage.processPendingInvitations(auth.userId, userEmail);
+      } catch (error) {
+        console.error("Error processing pending invitations:", error);
+      }
+    }
 
     (req as any).user = {
       claims: {

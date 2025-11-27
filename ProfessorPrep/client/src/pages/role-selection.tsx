@@ -140,7 +140,7 @@ export default function RoleSelection() {
             </div>
             <h1 className="text-2xl font-bold mb-2">Welcome, Professor!</h1>
             <p className="text-muted-foreground">
-              Here's what you can do with ClassMate
+              Effortlessly turn your course materials into AI-powered study tools for your students.
             </p>
           </div>
 

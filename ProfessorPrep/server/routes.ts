@@ -12,6 +12,7 @@ import officeParser from "officeparser";
 import tmp from "tmp";
 import { writeFile, unlink } from "fs/promises";
 import { sendCourseInvitationEmail } from "./email";
+import { registerAdminRoutes } from "./adminRoutes";
 import type { User } from "@shared/schema";
 
 // Demo account IDs that bypass subscription requirements (for testing purposes)
@@ -174,6 +175,9 @@ async function checkStudentAccess(req: any, res: any, next: any) {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Admin routes
+  registerAdminRoutes(app);
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {

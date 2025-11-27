@@ -211,6 +211,17 @@ export const shortAnswerEvaluations = pgTable("short_answer_evaluations", {
   evaluatedAt: timestamp("evaluated_at").defaultNow(),
 });
 
+// AI usage logs table - tracks OpenAI API usage for cost monitoring
+export const aiUsageLogs = pgTable("ai_usage_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  endpoint: varchar("endpoint").notNull(), // "practice_test", "tutor", "flashcards", "learning_objectives"
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  estimatedCostCents: integer("estimated_cost_cents"), // Cost in cents (e.g., 5 = $0.05)
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations (must be defined after all tables)
 export const usersRelations = relations(users, ({ many }) => ({
   coursesCreated: many(courses),
@@ -365,6 +376,13 @@ export const shortAnswerEvaluationsRelations = relations(shortAnswerEvaluations,
   attempt: one(practiceAttempts, {
     fields: [shortAnswerEvaluations.attemptId],
     references: [practiceAttempts.id],
+  }),
+}));
+
+export const aiUsageLogsRelations = relations(aiUsageLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [aiUsageLogs.userId],
+    references: [users.id],
   }),
 }));
 
@@ -526,3 +544,10 @@ export const insertShortAnswerEvaluationSchema = createInsertSchema(shortAnswerE
 });
 export type InsertShortAnswerEvaluation = z.infer<typeof insertShortAnswerEvaluationSchema>;
 export type ShortAnswerEvaluation = typeof shortAnswerEvaluations.$inferSelect;
+
+export const insertAiUsageLogSchema = createInsertSchema(aiUsageLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAiUsageLog = z.infer<typeof insertAiUsageLogSchema>;
+export type AiUsageLog = typeof aiUsageLogs.$inferSelect;

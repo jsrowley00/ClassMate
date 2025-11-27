@@ -35,7 +35,11 @@ The design emphasizes a clean, educational interface with a professional blue pr
 - **AI-Generated Flashcards**: Students can create and study customizable flashcard sets with progress tracking.
 - **AI Tutor Chat**: Real-time, Socratic AI tutor for personalized student support.
 - **Study Materials Viewer**: Organized access to all uploaded course materials.
-- **Student Management**: Professors can add or remove students by email.
+- **Student Management**: Professors can add or remove students by email. When adding students, the system checks subscription status:
+  - Students with active subscriptions are immediately enrolled with "Enrolled" status
+  - Students without subscriptions are added with "Pending" status and receive an invitation email
+  - Non-users receive an invitation email and are auto-enrolled when they sign up and subscribe
+  - The professor UI shows status badges (Enrolled/Pending/Invited) for each student
 
 ### System Design Choices
 - **Frontend**: React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI for components, and Tailwind CSS for styling.

@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, BookOpen, CreditCard, Check, Loader2 } from "lucide-react";
+import { GraduationCap, BookOpen, CreditCard, Check, Loader2, Upload, Users, BarChart3, FolderTree, Sparkles, ArrowRight } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
 interface StripeProduct {
@@ -23,6 +23,7 @@ export default function RoleSelection() {
   const { toast } = useToast();
   const [selectedRole, setSelectedRole] = useState<"professor" | "student" | null>(null);
   const [showPayment, setShowPayment] = useState(false);
+  const [showProfessorFeatures, setShowProfessorFeatures] = useState(false);
 
   const { data: productsData, isLoading: productsLoading } = useQuery({
     queryKey: ["/api/stripe/products"],
@@ -103,6 +104,10 @@ export default function RoleSelection() {
 
   const handleProfessorSelect = () => {
     setSelectedRole("professor");
+    setShowProfessorFeatures(true);
+  };
+
+  const handleProfessorContinue = () => {
     setRoleMutation.mutate("professor");
   };
 
@@ -123,6 +128,142 @@ export default function RoleSelection() {
       currency: currency.toUpperCase(),
     }).format(amount / 100);
   };
+
+  if (showProfessorFeatures) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-4xl w-full">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <BookOpen className="h-10 w-10 text-primary" />
+              <span className="text-3xl font-bold">ClassMate</span>
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Welcome, Professor!</h1>
+            <p className="text-muted-foreground">
+              Here's what you can do with ClassMate
+            </p>
+          </div>
+
+          <Card className="mb-8">
+            <CardHeader className="text-center pb-2">
+              <div className="inline-flex items-center justify-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-4 py-2 rounded-full mx-auto mb-4">
+                <Check className="h-5 w-5" />
+                <span className="font-semibold">Always Free for Professors</span>
+              </div>
+              <CardTitle className="text-xl">Everything You Need to Empower Your Students</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-6 mt-4">
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FolderTree className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Organize Course Materials</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Create courses with flexible modules and sub-modules. Structure your content exactly how you teach it.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Upload className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Upload Any Material</h3>
+                    <p className="text-sm text-muted-foreground">
+                      PDFs, Word docs, PowerPoints, images - upload your existing materials and let AI do the rest.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Sparkles className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">AI-Generated Learning Objectives</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically generate SMART learning objectives from your materials to guide student learning.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Easy Student Enrollment</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Share a simple course code and students can join instantly. No complicated setup required.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <BarChart3 className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">Student Progress Analytics</h3>
+                    <p className="text-sm text-muted-foreground">
+                      See which concepts students are struggling with and where they're excelling.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <GraduationCap className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">AI Study Tools for Students</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Your students get AI practice tests, flashcards, and a personal tutor - all based on your materials.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="text-center space-y-4">
+            <Button
+              size="lg"
+              className="px-8"
+              onClick={handleProfessorContinue}
+              disabled={setRoleMutation.isPending}
+            >
+              {setRoleMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Setting up your account...
+                </>
+              ) : (
+                <>
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+            <div>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowProfessorFeatures(false);
+                  setSelectedRole(null);
+                }}
+              >
+                Back to role selection
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (showPayment) {
     return (

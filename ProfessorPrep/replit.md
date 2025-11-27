@@ -40,6 +40,11 @@ The design emphasizes a clean, educational interface with a professional blue pr
   - Students without subscriptions are added with "Pending" status and receive an invitation email
   - Non-users receive an invitation email and are auto-enrolled when they sign up and subscribe
   - The professor UI shows status badges (Enrolled/Pending/Invited) for each student
+- **Admin Dashboard**: Platform admin dashboard accessible at `/admin` for users with admin email (jsrowley00@gmail.com). Features:
+  - User management: view all users with search/sort, see subscription status and role
+  - Platform metrics: total users, active subscribers, courses, practice tests, flashcard sets, chat sessions
+  - AI usage tracking: monitor token usage and estimated costs per endpoint (practice tests, flashcards, tutor, global tutor)
+  - AI cost tracking logs usage with input/output tokens and estimated costs per user
 
 ### System Design Choices
 - **Frontend**: React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI for components, and Tailwind CSS for styling.

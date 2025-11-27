@@ -13,27 +13,15 @@ import { Users, DollarSign, BookOpen, Bot, Search, ArrowUpDown } from "lucide-re
 import { Link } from "wouter";
 
 interface PlatformMetrics {
-  users: {
-    total: number;
-    professors: number;
-    students: number;
-    activeSubscribers: number;
-    expiredSubscribers: number;
-  };
-  courses: {
-    total: number;
-    professorCourses: number;
-    selfStudyRooms: number;
-  };
-  engagement: {
-    totalPracticeTests: number;
-    totalFlashcardSets: number;
-    totalChatMessages: number;
-  };
-  revenue: {
-    totalPayments: number;
-    estimatedMonthlyRevenue: number;
-  };
+  totalUsers: number;
+  activeSubscribers: number;
+  professors: number;
+  students: number;
+  totalCourses: number;
+  totalPracticeTests: number;
+  totalChatSessions: number;
+  totalFlashcardSets: number;
+  totalAiCostCents: number;
 }
 
 interface UserData {
@@ -47,13 +35,28 @@ interface UserData {
   createdAt: string;
 }
 
-interface AIUsageData {
-  userId: string | null;
+interface AIUsageByEndpoint {
   endpoint: string;
-  totalRequests: number;
+  callCount: number;
   totalInputTokens: number;
   totalOutputTokens: number;
   totalCostCents: number;
+}
+
+interface AIUsageByUser {
+  userId: string | null;
+  userEmail: string | null;
+  userName: string | null;
+  callCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostCents: number;
+}
+
+interface AIUsageResponse {
+  byUser: AIUsageByUser[];
+  byEndpoint: AIUsageByEndpoint[];
+  recentLogs: any[];
 }
 
 const ADMIN_EMAIL = "jsrowley00@gmail.com";
@@ -101,7 +104,7 @@ export default function AdminDashboard() {
     enabled: isAuthenticated && user?.email === ADMIN_EMAIL,
   });
 
-  const { data: aiUsage, isLoading: aiUsageLoading } = useQuery<AIUsageData[]>({
+  const { data: aiUsage, isLoading: aiUsageLoading } = useQuery<AIUsageResponse>({
     queryKey: ["/api/admin/ai-usage"],
     enabled: isAuthenticated && user?.email === ADMIN_EMAIL,
   });
@@ -152,7 +155,7 @@ export default function AdminDashboard() {
     return `$${(cents / 100).toFixed(2)}`;
   };
 
-  const totalAiCost = aiUsage?.reduce((sum, u) => sum + u.totalCostCents, 0) || 0;
+  const totalAiCost = aiUsage?.byEndpoint?.reduce((sum, u) => sum + u.totalCostCents, 0) || 0;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -174,9 +177,9 @@ export default function AdminDashboard() {
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <div className="text-2xl font-bold">{metrics?.users.total || 0}</div>
+                <div className="text-2xl font-bold">{metrics?.totalUsers || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {metrics?.users.professors || 0} professors, {metrics?.users.students || 0} students
+                  {metrics?.professors || 0} professors, {metrics?.students || 0} students
                 </p>
               </>
             )}
@@ -193,9 +196,9 @@ export default function AdminDashboard() {
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <div className="text-2xl font-bold">{metrics?.users.activeSubscribers || 0}</div>
+                <div className="text-2xl font-bold">{metrics?.activeSubscribers || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {metrics?.users.expiredSubscribers || 0} expired
+                  Paid students
                 </p>
               </>
             )}
@@ -212,9 +215,9 @@ export default function AdminDashboard() {
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <div className="text-2xl font-bold">{metrics?.courses.total || 0}</div>
+                <div className="text-2xl font-bold">{metrics?.totalCourses || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {metrics?.courses.professorCourses || 0} courses, {metrics?.courses.selfStudyRooms || 0} study rooms
+                  {metrics?.totalFlashcardSets || 0} flashcard sets
                 </p>
               </>
             )}
@@ -381,12 +384,11 @@ export default function AdminDashboard() {
                     <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
-              ) : aiUsage && aiUsage.length > 0 ? (
+              ) : aiUsage?.byEndpoint && aiUsage.byEndpoint.length > 0 ? (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>User ID</TableHead>
                         <TableHead>Endpoint</TableHead>
                         <TableHead className="text-right">Requests</TableHead>
                         <TableHead className="text-right">Input Tokens</TableHead>
@@ -395,15 +397,12 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {aiUsage.map((usage, idx) => (
-                        <TableRow key={`${usage.userId}-${usage.endpoint}-${idx}`}>
-                          <TableCell className="font-mono text-xs">
-                            {usage.userId?.slice(0, 8) || 'Anonymous'}...
-                          </TableCell>
+                      {aiUsage.byEndpoint.map((usage, idx) => (
+                        <TableRow key={`${usage.endpoint}-${idx}`}>
                           <TableCell>
                             <Badge variant="outline">{usage.endpoint}</Badge>
                           </TableCell>
-                          <TableCell className="text-right">{usage.totalRequests}</TableCell>
+                          <TableCell className="text-right">{usage.callCount}</TableCell>
                           <TableCell className="text-right">{usage.totalInputTokens.toLocaleString()}</TableCell>
                           <TableCell className="text-right">{usage.totalOutputTokens.toLocaleString()}</TableCell>
                           <TableCell className="text-right font-medium">
@@ -434,7 +433,7 @@ export default function AdminDashboard() {
                 {metricsLoading ? (
                   <Skeleton className="h-12 w-24" />
                 ) : (
-                  <div className="text-3xl font-bold">{metrics?.engagement.totalPracticeTests || 0}</div>
+                  <div className="text-3xl font-bold">{metrics?.totalPracticeTests || 0}</div>
                 )}
               </CardContent>
             </Card>
@@ -448,21 +447,21 @@ export default function AdminDashboard() {
                 {metricsLoading ? (
                   <Skeleton className="h-12 w-24" />
                 ) : (
-                  <div className="text-3xl font-bold">{metrics?.engagement.totalFlashcardSets || 0}</div>
+                  <div className="text-3xl font-bold">{metrics?.totalFlashcardSets || 0}</div>
                 )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Chat Messages</CardTitle>
-                <CardDescription>Total AI tutor interactions</CardDescription>
+                <CardTitle className="text-lg">Chat Sessions</CardTitle>
+                <CardDescription>Total AI tutor sessions</CardDescription>
               </CardHeader>
               <CardContent>
                 {metricsLoading ? (
                   <Skeleton className="h-12 w-24" />
                 ) : (
-                  <div className="text-3xl font-bold">{metrics?.engagement.totalChatMessages || 0}</div>
+                  <div className="text-3xl font-bold">{metrics?.totalChatSessions || 0}</div>
                 )}
               </CardContent>
             </Card>

@@ -69,11 +69,15 @@ function Router() {
     );
   }
 
+  // Admin can access dashboard even without role selected
+  const isAdmin = user?.email === 'jsrowley00@gmail.com';
+
   if (!user?.role) {
     return (
       <Switch>
         <Route path="/checkout/success" component={CheckoutSuccess} />
         <Route path="/checkout/cancel" component={CheckoutCancel} />
+        {isAdmin && <Route path="/admin" component={AdminDashboard} />}
         <Route>
           <RoleSelection />
         </Route>

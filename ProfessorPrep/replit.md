@@ -45,6 +45,11 @@ The design emphasizes a clean, educational interface with a professional blue pr
   - Platform metrics: total users, active subscribers, courses, practice tests, flashcard sets, chat sessions
   - AI usage tracking: monitor token usage and estimated costs per endpoint (practice tests, flashcards, tutor, global tutor)
   - AI cost tracking logs usage with input/output tokens and estimated costs per user
+- **Onboarding Tutorial**: First-time users are shown an interactive guided tour that walks them through key features:
+  - For students: sidebar navigation, Study Assistant chatbot, My Courses section, creating self-study rooms, uploading files, and organizing with modules
+  - For professors: sidebar navigation, creating courses, adding modules, uploading materials, and inviting students
+  - Users can re-access the tutorial anytime via the "Show me how" button on their dashboard
+  - Onboarding completion is tracked per role (hasSeenStudentOnboarding, hasSeenProfessorOnboarding fields in users table)
 
 ### System Design Choices
 - **Frontend**: React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI for components, and Tailwind CSS for styling.

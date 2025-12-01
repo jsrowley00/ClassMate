@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, ArrowRight, FileText, Brain, Layers, MessageCircle, Plus, Home } from "lucide-react";
+import { BookOpen, ArrowRight, FileText, Brain, Layers, MessageCircle, Plus, Home, HelpCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -19,15 +19,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { OnboardingTutorial } from "@/components/onboarding-tutorial";
+import { apiRequest } from "@/lib/queryClient";
 import type { Course } from "@shared/schema";
 
 export default function StudentDashboard() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomDescription, setNewRoomDescription] = useState("");
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -41,6 +45,25 @@ export default function StudentDashboard() {
       }, 500);
     }
   }, [isAuthenticated, authLoading, toast]);
+
+  useEffect(() => {
+    if (user && !onboardingChecked) {
+      setOnboardingChecked(true);
+      if (!user.hasSeenStudentOnboarding) {
+        setShowOnboarding(true);
+      }
+    }
+  }, [user, onboardingChecked]);
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    try {
+      await apiRequest("POST", "/api/auth/complete-onboarding", { role: "student" });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+    }
+  };
 
   const { data: enrolledCourses, isLoading: enrolledLoading } = useQuery<Course[]>({
     queryKey: ["/api/student/enrolled-courses"],
@@ -161,14 +184,33 @@ export default function StudentDashboard() {
   );
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      {/* My Courses Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">My Courses</h1>
-        <p className="text-muted-foreground">
-          Courses your professors have added you to
-        </p>
-      </div>
+    <>
+      <OnboardingTutorial
+        role="student"
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onComplete={handleOnboardingComplete}
+      />
+      
+      <div className="p-6 md:p-8 max-w-7xl mx-auto">
+        {/* Header with Help Button */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">My Courses</h1>
+            <p className="text-muted-foreground">
+              Courses your professors have added you to
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowOnboarding(true)}
+            className="flex items-center gap-2"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Show me how
+          </Button>
+        </div>
       {enrolledLoading ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
           {[1, 2, 3].map((i) => (
@@ -305,6 +347,7 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </>
   );
 }

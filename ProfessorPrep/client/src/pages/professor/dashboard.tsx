@@ -1,17 +1,22 @@
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Users, FileText, Plus } from "lucide-react";
+import { BookOpen, Users, FileText, Plus, HelpCircle } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OnboardingTutorial } from "@/components/onboarding-tutorial";
+import { apiRequest } from "@/lib/queryClient";
 import type { Course } from "@shared/schema";
 
 export default function ProfessorDashboard() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const queryClient = useQueryClient();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -26,6 +31,25 @@ export default function ProfessorDashboard() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
+  useEffect(() => {
+    if (user && !onboardingChecked) {
+      setOnboardingChecked(true);
+      if (!user.hasSeenProfessorOnboarding) {
+        setShowOnboarding(true);
+      }
+    }
+  }, [user, onboardingChecked]);
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    try {
+      await apiRequest("POST", "/api/auth/complete-onboarding", { role: "professor" });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+    }
+  };
+
   const { data: courses, isLoading } = useQuery<Course[]>({
     queryKey: ["/api/courses"],
     enabled: isAuthenticated,
@@ -36,13 +60,33 @@ export default function ProfessorDashboard() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Professor Dashboard</h1>
-        <p className="text-muted-foreground">
-          Manage your courses and uploaded study materials
-        </p>
-      </div>
+    <>
+      <OnboardingTutorial
+        role="professor"
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onComplete={handleOnboardingComplete}
+      />
+      
+      <div className="p-6 md:p-8 max-w-7xl mx-auto">
+        {/* Header with Help Button */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Professor Dashboard</h1>
+            <p className="text-muted-foreground">
+              Manage your courses and uploaded study materials
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowOnboarding(true)}
+            className="flex items-center gap-2"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Show me how
+          </Button>
+        </div>
 
       {/* Stats Cards */}
       <div className="grid gap-6 md:grid-cols-3 mb-8">
@@ -154,7 +198,8 @@ export default function ProfessorDashboard() {
             </CardContent>
           </Card>
         )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

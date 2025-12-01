@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { HelpButton } from "@/components/help-button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ProfessorSidebar, StudentSidebar } from "@/components/app-sidebar";
 import { RoleSwitcher } from "@/components/role-switcher";
@@ -110,6 +111,7 @@ function Router() {
                       hasProfessorAccess={user?.hasProfessorAccess}
                       subscriptionStatus={user?.subscriptionStatus}
                     />
+                    <HelpButton />
                     <ThemeToggle />
                     <UserButton afterSignOutUrl="/" />
                   </div>
@@ -153,6 +155,7 @@ function Router() {
                       hasProfessorAccess={user?.hasProfessorAccess}
                       subscriptionStatus={user?.subscriptionStatus}
                     />
+                    <HelpButton />
                     <ThemeToggle />
                     <UserButton afterSignOutUrl="/" />
                   </div>

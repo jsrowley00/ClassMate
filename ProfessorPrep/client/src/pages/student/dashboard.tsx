@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, ArrowRight, FileText, Brain, Layers, MessageCircle, Plus, Home, HelpCircle } from "lucide-react";
+import { BookOpen, ArrowRight, FileText, Brain, Layers, MessageCircle, Plus, Home } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,12 @@ export default function StudentDashboard() {
       }
     }
   }, [user, onboardingChecked]);
+
+  useEffect(() => {
+    const handleShowOnboarding = () => setShowOnboarding(true);
+    window.addEventListener('show-onboarding', handleShowOnboarding);
+    return () => window.removeEventListener('show-onboarding', handleShowOnboarding);
+  }, []);
 
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false);
@@ -193,23 +199,11 @@ export default function StudentDashboard() {
       />
       
       <div className="p-6 md:p-8 max-w-7xl mx-auto">
-        {/* Header with Help Button */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">My Courses</h1>
-            <p className="text-muted-foreground">
-              Courses your professors have added you to
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowOnboarding(true)}
-            className="flex items-center gap-2"
-          >
-            <HelpCircle className="h-4 w-4" />
-            Show me how
-          </Button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">My Courses</h1>
+          <p className="text-muted-foreground">
+            Courses your professors have added you to
+          </p>
         </div>
       {enrolledLoading ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">

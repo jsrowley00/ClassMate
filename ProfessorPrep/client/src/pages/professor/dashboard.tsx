@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Users, FileText, Plus, HelpCircle } from "lucide-react";
+import { BookOpen, Users, FileText, Plus } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OnboardingTutorial } from "@/components/onboarding-tutorial";
@@ -40,6 +40,12 @@ export default function ProfessorDashboard() {
     }
   }, [user, onboardingChecked]);
 
+  useEffect(() => {
+    const handleShowOnboarding = () => setShowOnboarding(true);
+    window.addEventListener('show-onboarding', handleShowOnboarding);
+    return () => window.removeEventListener('show-onboarding', handleShowOnboarding);
+  }, []);
+
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false);
     try {
@@ -69,23 +75,11 @@ export default function ProfessorDashboard() {
       />
       
       <div className="p-6 md:p-8 max-w-7xl mx-auto">
-        {/* Header with Help Button */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Professor Dashboard</h1>
-            <p className="text-muted-foreground">
-              Manage your courses and uploaded study materials
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowOnboarding(true)}
-            className="flex items-center gap-2"
-          >
-            <HelpCircle className="h-4 w-4" />
-            Show me how
-          </Button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Professor Dashboard</h1>
+          <p className="text-muted-foreground">
+            Manage your courses and uploaded study materials
+          </p>
         </div>
 
       {/* Stats Cards */}

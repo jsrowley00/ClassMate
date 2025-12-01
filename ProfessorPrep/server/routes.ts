@@ -254,6 +254,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark onboarding as complete
+  app.post('/api/auth/complete-onboarding', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { role } = req.body;
+
+      if (!role || !["professor", "student"].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      const updateData: any = { id: userId };
+      if (role === "student") {
+        updateData.hasSeenStudentOnboarding = true;
+      } else {
+        updateData.hasSeenProfessorOnboarding = true;
+      }
+
+      const user = await storage.upsertUser(updateData);
+      res.json(user);
+    } catch (error) {
+      console.error("Error completing onboarding:", error);
+      res.status(500).json({ message: "Failed to complete onboarding" });
+    }
+  });
+
   // Course routes
   app.get('/api/courses', isAuthenticated, async (req: any, res) => {
     try {

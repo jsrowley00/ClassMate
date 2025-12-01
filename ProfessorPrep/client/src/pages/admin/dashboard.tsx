@@ -144,15 +144,19 @@ export default function AdminDashboard() {
     setUserDetailLoading(true);
     try {
       const response = await apiRequest("GET", `/api/admin/users/${userId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
       const data = await response.json();
       setUserDetailData(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching user details:", error);
       toast({
         title: "Error",
-        description: "Failed to load user details",
+        description: error?.message || "Failed to load user details",
         variant: "destructive",
       });
+      setSelectedUserId(null);
     } finally {
       setUserDetailLoading(false);
     }
@@ -382,6 +386,7 @@ export default function AdminDashboard() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Name</TableHead>
                         <TableHead 
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => toggleSort("email")}
@@ -391,7 +396,6 @@ export default function AdminDashboard() {
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                         </TableHead>
-                        <TableHead>Name</TableHead>
                         <TableHead 
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => toggleSort("role")}
@@ -438,13 +442,13 @@ export default function AdminDashboard() {
                               onClick={() => handleUserClick(userData.id)}
                               className="font-medium text-primary hover:underline cursor-pointer text-left"
                             >
-                              {userData.email}
+                              {userData.firstName || userData.lastName 
+                                ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
+                                : userData.email}
                             </button>
                           </TableCell>
-                          <TableCell>
-                            {userData.firstName || userData.lastName 
-                              ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
-                              : '-'}
+                          <TableCell className="text-muted-foreground">
+                            {userData.email}
                           </TableCell>
                           <TableCell>
                             {userData.role ? (

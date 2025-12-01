@@ -143,11 +143,7 @@ export default function AdminDashboard() {
   const fetchUserDetails = async (userId: string) => {
     setUserDetailLoading(true);
     try {
-      const response = await apiRequest("GET", `/api/admin/users/${userId}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await apiRequest("GET", `/api/admin/users/${userId}`);
       setUserDetailData(data);
     } catch (error: any) {
       console.error("Error fetching user details:", error);

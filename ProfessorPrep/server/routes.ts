@@ -134,6 +134,11 @@ async function checkStudentAccess(req: any, res: any, next: any) {
       return next();
     }
 
+    // Admin emails bypass subscription checks
+    if (user.email && ADMIN_EMAILS.includes(user.email)) {
+      return next();
+    }
+
     // Demo accounts bypass subscription checks
     if (DEMO_ACCOUNT_IDS.includes(userId)) {
       return next();

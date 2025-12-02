@@ -414,9 +414,16 @@ export default function PracticeTest() {
               <div>
                 <CardTitle>Question {currentQuestionIndex + 1} of {currentTest?.questions?.length || 0}</CardTitle>
                 <CardDescription>
-                  <Badge variant="secondary" className="mt-2">
-                    {currentTest?.testMode?.replace("_", " ").toUpperCase() || "TEST"}
-                  </Badge>
+                  <div className="flex gap-2 mt-2">
+                    <Badge variant="secondary">
+                      {currentTest?.testMode?.replace("_", " ").toUpperCase() || "TEST"}
+                    </Badge>
+                    {currentQuestion?.type && (
+                      <Badge variant="outline">
+                        {currentQuestion.type.replace("_", " ").replace("fill blank", "Fill in the Blank")}
+                      </Badge>
+                    )}
+                  </div>
                 </CardDescription>
               </div>
               <div className="text-sm text-muted-foreground">

@@ -55,11 +55,10 @@ ${learningObjectives.length > 0 ? '8' : '7'}. Generate questions that test under
 
 Return your response as a JSON array of questions. Each question should have:
 - question: The question text
-- type: "${testMode === "multiple_choice" ? "multiple_choice" : testMode === "short_answer" ? "short_answer" : testMode === "fill_blank" ? "fill_blank" : "multiple_choice"}"
-${testMode === "multiple_choice" ? '- options: An array of 4 answer choices' : ''}
+- type: ${testMode === "mixed" ? '"multiple_choice", "short_answer", or "fill_blank" (vary the types across questions)' : `"${testMode === "multiple_choice" ? "multiple_choice" : testMode === "short_answer" ? "short_answer" : testMode === "fill_blank" ? "fill_blank" : "multiple_choice"}"`}
+${testMode === "multiple_choice" ? '- options: An array of 4 answer choices' : testMode === "mixed" ? '- options: An array of 4 answer choices (ONLY for multiple_choice type questions, omit for other types)' : ''}
 - correctAnswer: The correct answer${learningObjectives.length > 0 ? '\n- objectiveIndices: An array of objective numbers (starting from 1) that this question assesses. For example, if a question tests objective #2 and #5, use [2, 5]' : ''}
-
-For mixed mode, vary both the question types AND the topics covered.`;
+${testMode === "mixed" ? '\nFor mixed mode: Generate a balanced mix of all three question types (multiple_choice, short_answer, fill_blank). Include options array ONLY for multiple_choice questions.' : ''}`;
 
   try {
     const response = await openai.chat.completions.create({

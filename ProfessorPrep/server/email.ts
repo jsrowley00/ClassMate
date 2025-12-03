@@ -7,7 +7,7 @@ if (!apiKey) {
 
 const resend = new Resend(apiKey);
 
-const FROM_EMAIL = 'ClassMate <onboarding@resend.dev>';
+const FROM_EMAIL = 'ClassMate <noreply@classmate.help>';
 
 export async function sendCourseInvitationEmail(
   recipientEmail: string,

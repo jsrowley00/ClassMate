@@ -1054,6 +1054,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/courses/:id/enrollments/batch', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { emails } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!emails || !Array.isArray(emails) || emails.length === 0) {
+        return res.status(400).json({ message: "No emails provided" });
+      }
+
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      if (course.professorId !== userId) {
+        return res.status(403).json({ message: "Only the course professor can add students" });
+      }
+
+      const professor = await storage.getUser(userId);
+      const professorName = professor?.firstName && professor?.lastName 
+        ? `${professor.firstName} ${professor.lastName}` 
+        : professor?.email || "Your professor";
+
+      const results = {
+        enrolled: [] as string[],
+        invited: [] as string[],
+        skipped: [] as { email: string; reason: string }[],
+      };
+
+      for (const email of emails) {
+        try {
+          const normalizedEmail = email.toLowerCase().trim();
+          
+          const student = await storage.getUserByEmail(normalizedEmail);
+          
+          if (student) {
+            const existingEnrollment = await storage.getEnrollment(student.id, id);
+            if (existingEnrollment) {
+              results.skipped.push({ email: normalizedEmail, reason: "Already enrolled" });
+              continue;
+            }
+
+            const hasSubscription = student.subscriptionStatus === "active" ||
+              (student.subscriptionExpiresAt && new Date(student.subscriptionExpiresAt) > new Date()) ||
+              student.email === "jsrowley00@gmail.com";
+
+            const status = hasSubscription ? "enrolled" : "pending";
+
+            await storage.enrollStudent({
+              studentId: student.id,
+              courseId: id,
+              status,
+            });
+
+            if (status === "enrolled") {
+              results.enrolled.push(normalizedEmail);
+            } else {
+              results.invited.push(normalizedEmail);
+            }
+          } else {
+            const existingInvitation = await storage.getCourseInvitation(id, normalizedEmail);
+            if (existingInvitation && existingInvitation.status === "pending") {
+              results.skipped.push({ email: normalizedEmail, reason: "Already invited" });
+              continue;
+            }
+
+            await storage.createCourseInvitation({
+              courseId: id,
+              email: normalizedEmail,
+              status: "pending",
+            });
+
+            try {
+              const signUpUrl = process.env.REPLIT_DEV_DOMAIN 
+                ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+                : 'https://classmate.study';
+              await sendCourseInvitationEmail(normalizedEmail, course.name, professorName, signUpUrl);
+            } catch (emailError) {
+              console.error("Failed to send invitation email:", emailError);
+            }
+
+            results.invited.push(normalizedEmail);
+          }
+        } catch (err: any) {
+          console.error(`Error processing email ${email}:`, err);
+          results.skipped.push({ email, reason: err.message || "Processing error" });
+        }
+      }
+
+      res.status(200).json({
+        message: `Processed ${emails.length} email(s)`,
+        enrolled: results.enrolled,
+        invited: results.invited,
+        skipped: results.skipped,
+      });
+    } catch (error: any) {
+      console.error("Error batch adding students:", error);
+      res.status(500).json({ message: error.message || "Failed to add students" });
+    }
+  });
+
   app.delete('/api/courses/:courseId/students/:studentId', isAuthenticated, async (req: any, res) => {
     try {
       const { courseId, studentId } = req.params;

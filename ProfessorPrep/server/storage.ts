@@ -175,6 +175,10 @@ export class DatabaseStorage implements IStorage {
           hasProfessorAccess: userData.hasProfessorAccess ?? existingUserById.hasProfessorAccess,
           hasSeenStudentOnboarding: userData.hasSeenStudentOnboarding ?? existingUserById.hasSeenStudentOnboarding,
           hasSeenProfessorOnboarding: userData.hasSeenProfessorOnboarding ?? existingUserById.hasSeenProfessorOnboarding,
+          canvasUrl: userData.canvasUrl !== undefined ? userData.canvasUrl : existingUserById.canvasUrl,
+          canvasAccessToken: userData.canvasAccessToken !== undefined ? userData.canvasAccessToken : existingUserById.canvasAccessToken,
+          canvasRefreshToken: userData.canvasRefreshToken !== undefined ? userData.canvasRefreshToken : existingUserById.canvasRefreshToken,
+          canvasTokenExpiresAt: userData.canvasTokenExpiresAt !== undefined ? userData.canvasTokenExpiresAt : existingUserById.canvasTokenExpiresAt,
           updatedAt: new Date(),
         })
         .where(eq(users.id, userData.id))

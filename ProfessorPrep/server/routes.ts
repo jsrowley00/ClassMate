@@ -2928,6 +2928,280 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ================== CANVAS INTEGRATION ROUTES ==================
+
+  // Check if Canvas is configured
+  app.get('/api/canvas/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const { isCanvasConfigured } = await import('./canvas');
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      res.json({
+        isConfigured: isCanvasConfigured(),
+        isConnected: Boolean(user?.canvasAccessToken && user?.canvasUrl),
+        canvasUrl: user?.canvasUrl || null,
+      });
+    } catch (error) {
+      console.error("Error checking Canvas status:", error);
+      res.status(500).json({ message: "Failed to check Canvas status" });
+    }
+  });
+
+  // Start Canvas OAuth flow
+  app.post('/api/canvas/connect', isAuthenticated, async (req: any, res) => {
+    try {
+      const { isCanvasConfigured, getCanvasOAuthUrl } = await import('./canvas');
+      
+      if (!isCanvasConfigured()) {
+        return res.status(400).json({ message: "Canvas integration is not configured" });
+      }
+
+      const { canvasUrl } = req.body;
+      if (!canvasUrl) {
+        return res.status(400).json({ message: "Canvas URL is required" });
+      }
+
+      const userId = req.user.claims.sub;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const redirectUri = `${baseUrl}/api/canvas/callback`;
+      
+      // Create a state token that includes user ID and canvas URL
+      const state = Buffer.from(JSON.stringify({ userId, canvasUrl })).toString('base64');
+      
+      const authUrl = getCanvasOAuthUrl(canvasUrl, redirectUri, state);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error starting Canvas OAuth:", error);
+      res.status(500).json({ message: "Failed to start Canvas connection" });
+    }
+  });
+
+  // Canvas OAuth callback
+  app.get('/api/canvas/callback', async (req: any, res) => {
+    try {
+      const { code, state, error: oauthError } = req.query;
+
+      if (oauthError) {
+        return res.redirect(`/professor?canvas_error=${encodeURIComponent(oauthError as string)}`);
+      }
+
+      if (!code || !state) {
+        return res.redirect('/professor?canvas_error=missing_params');
+      }
+
+      // Decode state to get user ID and canvas URL
+      const { userId, canvasUrl } = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const redirectUri = `${baseUrl}/api/canvas/callback`;
+
+      const { exchangeCanvasCode } = await import('./canvas');
+      const tokens = await exchangeCanvasCode(canvasUrl, code as string, redirectUri);
+      
+      // Calculate token expiration
+      const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+
+      // Save tokens to user
+      await storage.upsertUser({
+        id: userId,
+        canvasUrl: canvasUrl,
+        canvasAccessToken: tokens.access_token,
+        canvasRefreshToken: tokens.refresh_token,
+        canvasTokenExpiresAt: expiresAt,
+      });
+
+      res.redirect('/professor?canvas_connected=true');
+    } catch (error) {
+      console.error("Error in Canvas OAuth callback:", error);
+      res.redirect('/professor?canvas_error=callback_failed');
+    }
+  });
+
+  // Disconnect Canvas
+  app.post('/api/canvas/disconnect', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      await storage.upsertUser({
+        id: userId,
+        canvasUrl: null,
+        canvasAccessToken: null,
+        canvasRefreshToken: null,
+        canvasTokenExpiresAt: null,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting Canvas:", error);
+      res.status(500).json({ message: "Failed to disconnect Canvas" });
+    }
+  });
+
+  // Get Canvas courses
+  app.get('/api/canvas/courses', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user?.canvasAccessToken || !user?.canvasUrl) {
+        return res.status(400).json({ message: "Canvas not connected" });
+      }
+
+      const { getCanvasCourses } = await import('./canvas');
+      const courses = await getCanvasCourses(user.canvasUrl, user.canvasAccessToken);
+      
+      // Filter to only active courses where user is a teacher
+      const activeCourses = courses.filter(c => c.workflow_state === 'available');
+      
+      res.json(activeCourses);
+    } catch (error: any) {
+      console.error("Error fetching Canvas courses:", error);
+      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        return res.status(401).json({ message: "Canvas session expired. Please reconnect." });
+      }
+      res.status(500).json({ message: "Failed to fetch Canvas courses" });
+    }
+  });
+
+  // Get files for a Canvas course
+  app.get('/api/canvas/courses/:courseId/files', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { courseId } = req.params;
+
+      if (!user?.canvasAccessToken || !user?.canvasUrl) {
+        return res.status(400).json({ message: "Canvas not connected" });
+      }
+
+      const { getCanvasCourseFiles, getCanvasModules, getCanvasModuleItems } = await import('./canvas');
+      
+      // Get all files from the course
+      const files = await getCanvasCourseFiles(user.canvasUrl, user.canvasAccessToken, parseInt(courseId));
+      
+      // Also get module structure for context
+      const modules = await getCanvasModules(user.canvasUrl, user.canvasAccessToken, parseInt(courseId));
+      
+      // Get items for each module
+      const modulesWithItems = await Promise.all(
+        modules.map(async (module) => {
+          try {
+            const items = await getCanvasModuleItems(user.canvasUrl!, user.canvasAccessToken!, parseInt(courseId), module.id);
+            return { ...module, items };
+          } catch {
+            return { ...module, items: [] };
+          }
+        })
+      );
+
+      res.json({ files, modules: modulesWithItems });
+    } catch (error: any) {
+      console.error("Error fetching Canvas course files:", error);
+      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        return res.status(401).json({ message: "Canvas session expired. Please reconnect." });
+      }
+      res.status(500).json({ message: "Failed to fetch Canvas files" });
+    }
+  });
+
+  // Import files from Canvas to ClassMate
+  app.post('/api/canvas/import', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { fileIds, classmateModuleId, classmateCourseId } = req.body;
+
+      if (!user?.canvasAccessToken || !user?.canvasUrl) {
+        return res.status(400).json({ message: "Canvas not connected" });
+      }
+
+      if (!fileIds || !Array.isArray(fileIds) || fileIds.length === 0) {
+        return res.status(400).json({ message: "No files selected" });
+      }
+
+      if (!classmateCourseId) {
+        return res.status(400).json({ message: "ClassMate course ID is required" });
+      }
+
+      const { downloadCanvasFile } = await import('./canvas');
+      const importedFiles = [];
+      const errors = [];
+
+      for (const fileId of fileIds) {
+        try {
+          // Download file from Canvas
+          const { buffer, filename, contentType } = await downloadCanvasFile(
+            user.canvasUrl,
+            user.canvasAccessToken,
+            fileId
+          );
+
+          // Determine file type
+          let fileType = 'other';
+          if (contentType.includes('pdf')) fileType = 'pdf';
+          else if (contentType.includes('word') || filename.endsWith('.docx') || filename.endsWith('.doc')) fileType = 'docx';
+          else if (contentType.includes('presentation') || filename.endsWith('.pptx') || filename.endsWith('.ppt')) fileType = 'pptx';
+          else if (contentType.includes('image')) fileType = 'image';
+          else if (contentType.includes('video')) fileType = 'video';
+
+          // Store file as base64 data URL (matching existing upload pattern)
+          const base64Data = buffer.toString('base64');
+          const dataUrl = `data:${contentType};base64,${base64Data}`;
+
+          // Extract text for supported file types
+          let extractedText = null;
+          if (fileType === 'docx') {
+            try {
+              const result = await mammoth.extractRawText({ buffer });
+              extractedText = result.value;
+            } catch (e) {
+              console.error(`Error extracting text from ${filename}:`, e);
+            }
+          } else if (fileType === 'pptx') {
+            try {
+              const tmpFile = tmp.fileSync({ postfix: '.pptx' });
+              await writeFile(tmpFile.name, buffer);
+              extractedText = await officeParser.parseOfficeAsync(tmpFile.name);
+              await unlink(tmpFile.name);
+            } catch (e) {
+              console.error(`Error extracting text from ${filename}:`, e);
+            }
+          }
+
+          // Create course material
+          const material = await storage.createCourseMaterial({
+            courseId: classmateCourseId,
+            moduleId: classmateModuleId || null,
+            fileName: filename,
+            fileType,
+            fileUrl: dataUrl,
+            extractedText,
+          });
+
+          importedFiles.push({ filename, materialId: material.id });
+
+          // Auto-generate learning objectives if added to a module
+          if (classmateModuleId) {
+            autoGenerateLearningObjectives(classmateModuleId);
+          }
+        } catch (fileError: any) {
+          console.error(`Error importing file ${fileId}:`, fileError);
+          errors.push({ fileId, error: fileError.message });
+        }
+      }
+
+      res.json({
+        success: true,
+        imported: importedFiles,
+        errors: errors.length > 0 ? errors : undefined,
+      });
+    } catch (error: any) {
+      console.error("Error importing Canvas files:", error);
+      res.status(500).json({ message: error.message || "Failed to import files" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

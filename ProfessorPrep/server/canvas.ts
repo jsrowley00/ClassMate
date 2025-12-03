@@ -1,0 +1,223 @@
+import { storage } from "./storage";
+
+const CANVAS_CLIENT_ID = process.env.CANVAS_CLIENT_ID || "";
+const CANVAS_CLIENT_SECRET = process.env.CANVAS_CLIENT_SECRET || "";
+
+export interface CanvasCourse {
+  id: number;
+  name: string;
+  course_code: string;
+  enrollment_term_id?: number;
+  workflow_state: string;
+}
+
+export interface CanvasModule {
+  id: number;
+  name: string;
+  position: number;
+  items_count: number;
+  items_url: string;
+}
+
+export interface CanvasModuleItem {
+  id: number;
+  title: string;
+  type: string;
+  content_id?: number;
+  url?: string;
+  external_url?: string;
+}
+
+export interface CanvasFile {
+  id: number;
+  display_name: string;
+  filename: string;
+  url: string;
+  size: number;
+  content_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CanvasFolder {
+  id: number;
+  name: string;
+  full_name: string;
+  files_count: number;
+  folders_count: number;
+}
+
+export function getCanvasOAuthUrl(canvasUrl: string, redirectUri: string, state: string): string {
+  const baseUrl = canvasUrl.startsWith('https://') ? canvasUrl : `https://${canvasUrl}`;
+  const params = new URLSearchParams({
+    client_id: CANVAS_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    state: state,
+    scope: 'url:GET|/api/v1/courses url:GET|/api/v1/courses/:course_id/modules url:GET|/api/v1/courses/:course_id/modules/:module_id/items url:GET|/api/v1/courses/:course_id/files url:GET|/api/v1/files/:id',
+  });
+  return `${baseUrl}/login/oauth2/auth?${params.toString()}`;
+}
+
+export async function exchangeCanvasCode(
+  canvasUrl: string,
+  code: string,
+  redirectUri: string
+): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
+  const baseUrl = canvasUrl.startsWith('https://') ? canvasUrl : `https://${canvasUrl}`;
+  
+  const response = await fetch(`${baseUrl}/login/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: CANVAS_CLIENT_ID,
+      client_secret: CANVAS_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+      code: code,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to exchange Canvas code: ${error}`);
+  }
+
+  return response.json();
+}
+
+export async function refreshCanvasToken(
+  canvasUrl: string,
+  refreshToken: string
+): Promise<{ access_token: string; expires_in: number }> {
+  const baseUrl = canvasUrl.startsWith('https://') ? canvasUrl : `https://${canvasUrl}`;
+  
+  const response = await fetch(`${baseUrl}/login/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: CANVAS_CLIENT_ID,
+      client_secret: CANVAS_CLIENT_SECRET,
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to refresh Canvas token: ${error}`);
+  }
+
+  return response.json();
+}
+
+async function canvasApiRequest(
+  canvasUrl: string,
+  accessToken: string,
+  endpoint: string
+): Promise<any> {
+  const baseUrl = canvasUrl.startsWith('https://') ? canvasUrl : `https://${canvasUrl}`;
+  
+  const response = await fetch(`${baseUrl}/api/v1${endpoint}`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Canvas API error: ${error}`);
+  }
+
+  return response.json();
+}
+
+export async function getCanvasCourses(
+  canvasUrl: string,
+  accessToken: string
+): Promise<CanvasCourse[]> {
+  return canvasApiRequest(canvasUrl, accessToken, '/courses?enrollment_type=teacher&per_page=100');
+}
+
+export async function getCanvasModules(
+  canvasUrl: string,
+  accessToken: string,
+  courseId: number
+): Promise<CanvasModule[]> {
+  return canvasApiRequest(canvasUrl, accessToken, `/courses/${courseId}/modules?per_page=100`);
+}
+
+export async function getCanvasModuleItems(
+  canvasUrl: string,
+  accessToken: string,
+  courseId: number,
+  moduleId: number
+): Promise<CanvasModuleItem[]> {
+  return canvasApiRequest(canvasUrl, accessToken, `/courses/${courseId}/modules/${moduleId}/items?per_page=100`);
+}
+
+export async function getCanvasCourseFiles(
+  canvasUrl: string,
+  accessToken: string,
+  courseId: number
+): Promise<CanvasFile[]> {
+  return canvasApiRequest(canvasUrl, accessToken, `/courses/${courseId}/files?per_page=100`);
+}
+
+export async function getCanvasFile(
+  canvasUrl: string,
+  accessToken: string,
+  fileId: number
+): Promise<CanvasFile> {
+  return canvasApiRequest(canvasUrl, accessToken, `/files/${fileId}`);
+}
+
+export async function getCanvasCourseFolders(
+  canvasUrl: string,
+  accessToken: string,
+  courseId: number
+): Promise<CanvasFolder[]> {
+  return canvasApiRequest(canvasUrl, accessToken, `/courses/${courseId}/folders?per_page=100`);
+}
+
+export async function getCanvasFolderFiles(
+  canvasUrl: string,
+  accessToken: string,
+  folderId: number
+): Promise<CanvasFile[]> {
+  return canvasApiRequest(canvasUrl, accessToken, `/folders/${folderId}/files?per_page=100`);
+}
+
+export async function downloadCanvasFile(
+  canvasUrl: string,
+  accessToken: string,
+  fileId: number
+): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+  const file = await getCanvasFile(canvasUrl, accessToken, fileId);
+  
+  const response = await fetch(file.url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download file: ${response.statusText}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  
+  return {
+    buffer,
+    filename: file.display_name || file.filename,
+    contentType: file.content_type,
+  };
+}
+
+export function isCanvasConfigured(): boolean {
+  return Boolean(CANVAS_CLIENT_ID && CANVAS_CLIENT_SECRET);
+}

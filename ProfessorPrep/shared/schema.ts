@@ -39,6 +39,10 @@ export const users = pgTable("users", {
   stripePaymentId: varchar("stripe_payment_id"), // One-time payment ID
   subscriptionStatus: varchar("subscription_status"), // "active", "expired", etc.
   subscriptionExpiresAt: timestamp("subscription_expires_at"), // When the 4-month access period ends
+  canvasUrl: varchar("canvas_url"), // User's Canvas instance URL (e.g., "harvard.instructure.com")
+  canvasAccessToken: text("canvas_access_token"), // OAuth access token
+  canvasRefreshToken: text("canvas_refresh_token"), // OAuth refresh token
+  canvasTokenExpiresAt: timestamp("canvas_token_expires_at"), // When the access token expires
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -2948,73 +2948,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Start Canvas OAuth flow
+  // Connect Canvas with Personal Access Token
   app.post('/api/canvas/connect', isAuthenticated, async (req: any, res) => {
     try {
-      const { isCanvasConfigured, getCanvasOAuthUrl } = await import('./canvas');
+      const { canvasUrl, accessToken } = req.body;
       
-      if (!isCanvasConfigured()) {
-        return res.status(400).json({ message: "Canvas integration is not configured" });
-      }
-
-      const { canvasUrl } = req.body;
       if (!canvasUrl) {
         return res.status(400).json({ message: "Canvas URL is required" });
       }
+      if (!accessToken) {
+        return res.status(400).json({ message: "Access token is required" });
+      }
 
+      // Validate the token before saving
+      const { validateCanvasToken } = await import('./canvas');
+      const validation = await validateCanvasToken(canvasUrl, accessToken);
+      
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error || "Invalid Canvas credentials" });
+      }
+
+      // Encrypt and save the token
+      const { encryptToken } = await import('./encryption');
       const userId = req.user.claims.sub;
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const redirectUri = `${baseUrl}/api/canvas/callback`;
       
-      // Create a state token that includes user ID and canvas URL
-      const state = Buffer.from(JSON.stringify({ userId, canvasUrl })).toString('base64');
-      
-      const authUrl = getCanvasOAuthUrl(canvasUrl, redirectUri, state);
-      res.json({ authUrl });
-    } catch (error) {
-      console.error("Error starting Canvas OAuth:", error);
-      res.status(500).json({ message: "Failed to start Canvas connection" });
-    }
-  });
-
-  // Canvas OAuth callback
-  app.get('/api/canvas/callback', async (req: any, res) => {
-    try {
-      const { code, state, error: oauthError } = req.query;
-
-      if (oauthError) {
-        return res.redirect(`/professor?canvas_error=${encodeURIComponent(oauthError as string)}`);
-      }
-
-      if (!code || !state) {
-        return res.redirect('/professor?canvas_error=missing_params');
-      }
-
-      // Decode state to get user ID and canvas URL
-      const { userId, canvasUrl } = JSON.parse(Buffer.from(state as string, 'base64').toString());
-      
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const redirectUri = `${baseUrl}/api/canvas/callback`;
-
-      const { exchangeCanvasCode } = await import('./canvas');
-      const tokens = await exchangeCanvasCode(canvasUrl, code as string, redirectUri);
-      
-      // Calculate token expiration
-      const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
-
-      // Save tokens to user
       await storage.upsertUser({
         id: userId,
         canvasUrl: canvasUrl,
-        canvasAccessToken: tokens.access_token,
-        canvasRefreshToken: tokens.refresh_token,
-        canvasTokenExpiresAt: expiresAt,
+        canvasAccessToken: encryptToken(accessToken),
+        canvasRefreshToken: null,
+        canvasTokenExpiresAt: null,
       });
 
-      res.redirect('/professor?canvas_connected=true');
+      res.json({ success: true });
     } catch (error) {
-      console.error("Error in Canvas OAuth callback:", error);
-      res.redirect('/professor?canvas_error=callback_failed');
+      console.error("Error connecting Canvas:", error);
+      res.status(500).json({ message: "Failed to connect to Canvas" });
     }
   });
 
@@ -3048,8 +3017,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Canvas not connected" });
       }
 
+      const { decryptToken } = await import('./encryption');
       const { getCanvasCourses } = await import('./canvas');
-      const courses = await getCanvasCourses(user.canvasUrl, user.canvasAccessToken);
+      const accessToken = decryptToken(user.canvasAccessToken);
+      const courses = await getCanvasCourses(user.canvasUrl, accessToken);
       
       // Filter to only active courses where user is a teacher
       const activeCourses = courses.filter(c => c.workflow_state === 'available');
@@ -3075,19 +3046,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Canvas not connected" });
       }
 
+      const { decryptToken } = await import('./encryption');
       const { getCanvasCourseFiles, getCanvasModules, getCanvasModuleItems } = await import('./canvas');
+      const accessToken = decryptToken(user.canvasAccessToken);
       
       // Get all files from the course
-      const files = await getCanvasCourseFiles(user.canvasUrl, user.canvasAccessToken, parseInt(courseId));
+      const files = await getCanvasCourseFiles(user.canvasUrl, accessToken, parseInt(courseId));
       
       // Also get module structure for context
-      const modules = await getCanvasModules(user.canvasUrl, user.canvasAccessToken, parseInt(courseId));
+      const modules = await getCanvasModules(user.canvasUrl, accessToken, parseInt(courseId));
       
       // Get items for each module
       const modulesWithItems = await Promise.all(
         modules.map(async (module) => {
           try {
-            const items = await getCanvasModuleItems(user.canvasUrl!, user.canvasAccessToken!, parseInt(courseId), module.id);
+            const items = await getCanvasModuleItems(user.canvasUrl!, accessToken, parseInt(courseId), module.id);
             return { ...module, items };
           } catch {
             return { ...module, items: [] };
@@ -3124,7 +3097,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "ClassMate course ID is required" });
       }
 
+      const { decryptToken } = await import('./encryption');
       const { downloadCanvasFile } = await import('./canvas');
+      const accessToken = decryptToken(user.canvasAccessToken);
       const importedFiles = [];
       const errors = [];
 
@@ -3133,7 +3108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Download file from Canvas
           const { buffer, filename, contentType } = await downloadCanvasFile(
             user.canvasUrl,
-            user.canvasAccessToken,
+            accessToken,
             fileId
           );
 

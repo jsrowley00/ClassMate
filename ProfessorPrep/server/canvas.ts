@@ -221,3 +221,34 @@ export async function downloadCanvasFile(
 export function isCanvasConfigured(): boolean {
   return Boolean(CANVAS_CLIENT_ID && CANVAS_CLIENT_SECRET);
 }
+
+// Validate a Personal Access Token by making a test API call
+export async function validateCanvasToken(
+  canvasUrl: string,
+  accessToken: string
+): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const baseUrl = canvasUrl.startsWith('https://') ? canvasUrl : `https://${canvasUrl}`;
+    
+    const response = await fetch(`${baseUrl}/api/v1/users/self`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.ok) {
+      return { valid: true };
+    } else if (response.status === 401) {
+      return { valid: false, error: 'Invalid access token. Please check your token and try again.' };
+    } else if (response.status === 403) {
+      return { valid: false, error: 'Access denied. The token may not have sufficient permissions.' };
+    } else {
+      return { valid: false, error: `Canvas returned an error (${response.status}). Please check your Canvas URL.` };
+    }
+  } catch (error: any) {
+    if (error.message?.includes('fetch failed') || error.message?.includes('ENOTFOUND')) {
+      return { valid: false, error: 'Could not connect to Canvas. Please check your Canvas URL is correct.' };
+    }
+    return { valid: false, error: `Connection failed: ${error.message}` };
+  }
+}

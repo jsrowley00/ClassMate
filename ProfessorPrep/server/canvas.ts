@@ -47,6 +47,28 @@ export interface CanvasFolder {
   folders_count: number;
 }
 
+export interface CanvasEnrollment {
+  id: number;
+  user_id: number;
+  course_id: number;
+  type: string;
+  enrollment_state: string;
+  user: {
+    id: number;
+    name: string;
+    login_id?: string;
+    email?: string;
+    sortable_name?: string;
+  };
+}
+
+export interface CanvasStudent {
+  id: number;
+  name: string;
+  email: string;
+  enrollmentState: string;
+}
+
 export function getCanvasOAuthUrl(canvasUrl: string, redirectUri: string, state: string): string {
   const baseUrl = canvasUrl.startsWith('https://') ? canvasUrl : `https://${canvasUrl}`;
   const params = new URLSearchParams({
@@ -251,4 +273,25 @@ export async function validateCanvasToken(
     }
     return { valid: false, error: `Connection failed: ${error.message}` };
   }
+}
+
+export async function getCanvasCourseStudents(
+  canvasUrl: string,
+  accessToken: string,
+  courseId: number
+): Promise<CanvasStudent[]> {
+  const enrollments: CanvasEnrollment[] = await canvasApiRequest(
+    canvasUrl, 
+    accessToken, 
+    `/courses/${courseId}/enrollments?type[]=StudentEnrollment&include[]=user&per_page=100`
+  );
+  
+  return enrollments
+    .filter(e => e.user && (e.user.email || e.user.login_id))
+    .map(e => ({
+      id: e.user.id,
+      name: e.user.name,
+      email: e.user.email || e.user.login_id || '',
+      enrollmentState: e.enrollment_state,
+    }));
 }

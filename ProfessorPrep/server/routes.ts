@@ -3077,6 +3077,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get students for a Canvas course
+  app.get('/api/canvas/courses/:courseId/students', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { courseId } = req.params;
+
+      if (!user?.canvasAccessToken || !user?.canvasUrl) {
+        return res.status(400).json({ message: "Canvas not connected" });
+      }
+
+      const { decryptToken } = await import('./encryption');
+      const { getCanvasCourseStudents } = await import('./canvas');
+      const accessToken = decryptToken(user.canvasAccessToken);
+      
+      const students = await getCanvasCourseStudents(user.canvasUrl, accessToken, parseInt(courseId));
+      
+      res.json(students);
+    } catch (error: any) {
+      console.error("Error fetching Canvas students:", error);
+      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        return res.status(401).json({ message: "Canvas session expired. Please reconnect." });
+      }
+      res.status(500).json({ message: "Failed to fetch Canvas students" });
+    }
+  });
+
   // Import files from Canvas to ClassMate
   app.post('/api/canvas/import', isAuthenticated, async (req: any, res) => {
     try {

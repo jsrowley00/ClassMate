@@ -1,6 +1,11 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const apiKey = process.env.RESEND_API_KEY;
+if (!apiKey) {
+  console.warn('WARNING: RESEND_API_KEY is not set - emails will not be sent');
+}
+
+const resend = new Resend(apiKey);
 
 const FROM_EMAIL = 'ClassMate <onboarding@resend.dev>';
 
@@ -56,6 +61,9 @@ This invitation was sent via ClassMate. If you didn't expect this email, you can
   `;
 
   try {
+    console.log(`Attempting to send invitation email to ${recipientEmail}...`);
+    console.log(`RESEND_API_KEY present: ${!!process.env.RESEND_API_KEY}`);
+    
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: recipientEmail,
@@ -65,13 +73,13 @@ This invitation was sent via ClassMate. If you didn't expect this email, you can
     });
 
     if (error) {
-      console.error(`Failed to send invitation email to ${recipientEmail}:`, error);
+      console.error(`Resend API error for ${recipientEmail}:`, JSON.stringify(error));
       throw new Error(error.message);
     }
 
-    console.log(`Invitation email sent to ${recipientEmail}, id: ${data?.id}`);
-  } catch (error) {
-    console.error(`Failed to send invitation email to ${recipientEmail}:`, error);
+    console.log(`Invitation email sent successfully to ${recipientEmail}, id: ${data?.id}`);
+  } catch (error: any) {
+    console.error(`Failed to send invitation email to ${recipientEmail}:`, error?.message || error);
     throw error;
   }
 }

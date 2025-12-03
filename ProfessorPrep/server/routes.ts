@@ -1178,6 +1178,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/courses/:courseId/invitations/:invitationId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { courseId, invitationId } = req.params;
+      const userId = req.user.claims.sub;
+      const course = await storage.getCourse(courseId);
+
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      if (course.professorId !== userId) {
+        return res.status(403).json({ message: "Only the course professor can remove invitations" });
+      }
+
+      const invitation = await storage.getCourseInvitationById(invitationId);
+      if (!invitation) {
+        return res.status(404).json({ message: "Invitation not found" });
+      }
+
+      if (invitation.courseId !== courseId) {
+        return res.status(400).json({ message: "Invitation does not belong to this course" });
+      }
+
+      await storage.deleteCourseInvitation(invitationId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing invitation:", error);
+      res.status(500).json({ message: "Failed to remove invitation" });
+    }
+  });
+
   // Practice test routes
   app.post('/api/courses/:id/practice/generate', isAuthenticated, checkStudentAccess, practiceTestLimiter, async (req: any, res) => {
     try {

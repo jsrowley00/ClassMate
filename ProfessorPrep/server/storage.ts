@@ -93,9 +93,11 @@ export interface IStorage {
   // Course invitation operations
   createCourseInvitation(invitation: InsertCourseInvitation): Promise<CourseInvitation>;
   getCourseInvitation(courseId: string, email: string): Promise<CourseInvitation | undefined>;
+  getCourseInvitationById(id: string): Promise<CourseInvitation | undefined>;
   getCourseInvitations(courseId: string): Promise<CourseInvitation[]>;
   getPendingInvitationsForEmail(email: string): Promise<Array<CourseInvitation & { course: Course }>>;
   acceptCourseInvitation(invitationId: string): Promise<void>;
+  deleteCourseInvitation(invitationId: string): Promise<void>;
   processPendingInvitations(userId: string, email: string): Promise<void>;
 
   // Practice test operations
@@ -508,6 +510,20 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(courseInvitations)
       .set({ status: "accepted", acceptedAt: new Date() })
+      .where(eq(courseInvitations.id, invitationId));
+  }
+
+  async getCourseInvitationById(id: string): Promise<CourseInvitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(courseInvitations)
+      .where(eq(courseInvitations.id, id));
+    return invitation;
+  }
+
+  async deleteCourseInvitation(invitationId: string): Promise<void> {
+    await db
+      .delete(courseInvitations)
       .where(eq(courseInvitations.id, invitationId));
   }
 

@@ -591,6 +591,36 @@ export default function CourseDetail() {
     },
   });
 
+  const removeInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      return await apiRequest("DELETE", `/api/courses/${id}/invitations/${invitationId}`, undefined);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Invitation removed successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/courses", id, "students"] });
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/sign-in";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove invitation",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -1469,6 +1499,15 @@ export default function CourseDetail() {
                       Waiting for signup • Invited {new Date(invitation.invitedAt).toLocaleDateString()}
                     </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeInvitationMutation.mutate(invitation.id)}
+                    disabled={removeInvitationMutation.isPending}
+                    data-testid={`button-remove-invitation-${invitation.id}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
             </div>

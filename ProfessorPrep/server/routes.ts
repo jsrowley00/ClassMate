@@ -1084,9 +1084,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         skipped: [] as { email: string; reason: string }[],
       };
 
+      console.log(`Batch enrollment request - processing ${emails.length} emails:`, emails);
+      
       for (const email of emails) {
         try {
           const normalizedEmail = email.toLowerCase().trim();
+          console.log(`Processing email: ${normalizedEmail}`);
           
           const student = await storage.getUserByEmail(normalizedEmail);
           

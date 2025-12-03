@@ -100,6 +100,32 @@ export function CanvasImportDialog({
     enabled: isOpen && selectedCourse !== null && step === "files" && activeTab === "students",
   });
 
+  interface EnrolledStudent {
+    id: string;
+    email: string;
+    enrollmentStatus: string;
+  }
+  
+  interface CourseInvitation {
+    id: string;
+    email: string;
+    status: string;
+  }
+
+  const { data: enrolledStudentsData } = useQuery<{ students: EnrolledStudent[]; invitations: CourseInvitation[] }>({
+    queryKey: ["/api/courses", classmateCourseId, "students"],
+    enabled: isOpen && step === "files" && activeTab === "students",
+  });
+
+  const alreadyEnrolledEmails = new Set([
+    ...(enrolledStudentsData?.students?.map(s => s.email?.toLowerCase()) || []),
+    ...(enrolledStudentsData?.invitations?.map(i => i.email?.toLowerCase()) || []),
+  ].filter(Boolean));
+
+  const availableCanvasStudents = studentsData?.filter(
+    s => !alreadyEnrolledEmails.has(s.email?.toLowerCase())
+  ) || [];
+
   useEffect(() => {
     if (isOpen && canvasStatus) {
       if (!canvasStatus.isConfigured) {
@@ -277,8 +303,8 @@ export function CanvasImportDialog({
   };
 
   const selectAllStudents = () => {
-    if (studentsData) {
-      setSelectedStudentEmails(new Set(studentsData.map(s => s.email)));
+    if (availableCanvasStudents.length > 0) {
+      setSelectedStudentEmails(new Set(availableCanvasStudents.map(s => s.email)));
     }
   };
 
@@ -620,11 +646,16 @@ export function CanvasImportDialog({
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
                 </div>
-              ) : studentsData && studentsData.length > 0 ? (
+              ) : availableCanvasStudents.length > 0 ? (
                 <>
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm text-muted-foreground">
-                      {studentsData.length} student(s) in Canvas course
+                      {availableCanvasStudents.length} student(s) available to invite
+                      {studentsData && studentsData.length > availableCanvasStudents.length && (
+                        <span className="text-xs ml-1">
+                          ({studentsData.length - availableCanvasStudents.length} already enrolled/invited)
+                        </span>
+                      )}
                     </p>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={selectAllStudents}>
@@ -637,7 +668,7 @@ export function CanvasImportDialog({
                   </div>
                   <ScrollArea className="h-[300px] border rounded-md p-2">
                     <div className="space-y-1">
-                      {studentsData.map((student) => (
+                      {availableCanvasStudents.map((student) => (
                         <div
                           key={student.id}
                           className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded-md cursor-pointer"
@@ -682,6 +713,11 @@ export function CanvasImportDialog({
                     </Button>
                   </div>
                 </>
+              ) : studentsData && studentsData.length > 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>All {studentsData.length} student(s) from Canvas are already enrolled or invited.</p>
+                </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />

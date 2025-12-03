@@ -72,4 +72,4 @@ The design emphasizes a clean, educational interface with a professional blue pr
 - **OpenAI API**: Powers AI-driven features including learning objective generation, flashcard creation, practice test question generation, and personalized AI tutoring.
 - **PostgreSQL**: The primary database for storing all application data.
 - **Google Docs Viewer**: Used for in-browser preview of DOCX and PPTX files.
-- **Resend**: Email service for sending course invitation emails to students. Uses RESEND_API_KEY secret. Currently sends from `onboarding@resend.dev` (Resend's test domain). For production, verify the classmate.study domain in Resend dashboard to send from a branded address.
+- **Resend**: Email service for sending course invitation emails to students. Uses RESEND_API_KEY secret. Verify the classmate.help domain in Resend dashboard to send from a branded address like `noreply@classmate.help`.

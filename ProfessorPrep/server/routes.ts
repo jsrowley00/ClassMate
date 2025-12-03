@@ -1002,7 +1002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const signUpUrl = process.env.REPLIT_DEV_DOMAIN 
               ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-              : 'https://classmate.study';
+              : 'https://classmate.help';
             await sendCourseInvitationEmail(email, course.name, professorName, signUpUrl);
           } catch (emailError) {
             console.error("Failed to send invitation email:", emailError);
@@ -1035,7 +1035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const signUpUrl = process.env.REPLIT_DEV_DOMAIN 
             ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-            : 'https://classmate.study';
+            : 'https://classmate.help';
           await sendCourseInvitationEmail(email, course.name, professorName, signUpUrl);
         } catch (emailError) {
           console.error("Failed to send invitation email:", emailError);
@@ -1130,7 +1130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               const signUpUrl = process.env.REPLIT_DEV_DOMAIN 
                 ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-                : 'https://classmate.study';
+                : 'https://classmate.help';
               await sendCourseInvitationEmail(normalizedEmail, course.name, professorName, signUpUrl);
             } catch (emailError) {
               console.error("Failed to send invitation email:", emailError);

@@ -223,12 +223,13 @@ export function CanvasImportDialog({
     setExpandedModules(newExpanded);
   };
 
-  const getFileIcon = (contentType: string, filename: string) => {
-    if (contentType.includes("pdf") || filename.endsWith(".pdf")) return <FileText className="h-4 w-4" />;
-    if (contentType.includes("image") || /\.(jpg|jpeg|png|gif)$/i.test(filename)) return <Image className="h-4 w-4" />;
-    if (contentType.includes("video") || /\.(mp4|mov|avi|webm)$/i.test(filename)) return <Video className="h-4 w-4" />;
-    if (contentType.includes("word") || /\.(doc|docx)$/i.test(filename)) return <FileText className="h-4 w-4" />;
-    if (contentType.includes("presentation") || /\.(ppt|pptx)$/i.test(filename)) return <FileText className="h-4 w-4" />;
+  const getFileIcon = (contentType: string | undefined, filename: string) => {
+    const type = contentType || "";
+    if (type.includes("pdf") || filename.endsWith(".pdf")) return <FileText className="h-4 w-4" />;
+    if (type.includes("image") || /\.(jpg|jpeg|png|gif)$/i.test(filename)) return <Image className="h-4 w-4" />;
+    if (type.includes("video") || /\.(mp4|mov|avi|webm)$/i.test(filename)) return <Video className="h-4 w-4" />;
+    if (type.includes("word") || /\.(doc|docx)$/i.test(filename)) return <FileText className="h-4 w-4" />;
+    if (type.includes("presentation") || /\.(ppt|pptx)$/i.test(filename)) return <FileText className="h-4 w-4" />;
     return <File className="h-4 w-4" />;
   };
 

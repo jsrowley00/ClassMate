@@ -57,6 +57,7 @@ export function CanvasImportDialog({
   const queryClient = useQueryClient();
   
   const [canvasUrl, setCanvasUrl] = useState("");
+  const [accessToken, setAccessToken] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<CanvasCourse | null>(null);
   const [selectedFileIds, setSelectedFileIds] = useState<Set<number>>(new Set());
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
@@ -106,15 +107,15 @@ export function CanvasImportDialog({
   }, [isOpen]);
 
   const connectMutation = useMutation({
-    mutationFn: async (url: string) => {
-      const token = await getToken();
+    mutationFn: async ({ url, token: canvasToken }: { url: string; token: string }) => {
+      const authToken = await getToken();
       const response = await fetch("/api/canvas/connect", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ canvasUrl: url }),
+        body: JSON.stringify({ canvasUrl: url, accessToken: canvasToken }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -122,8 +123,14 @@ export function CanvasImportDialog({
       }
       return response.json();
     },
-    onSuccess: (data) => {
-      window.location.href = data.authUrl;
+    onSuccess: () => {
+      toast({
+        title: "Connected",
+        description: "Successfully connected to Canvas",
+      });
+      setAccessToken("");
+      queryClient.invalidateQueries({ queryKey: ["/api/canvas/status"] });
+      setStep("courses");
     },
     onError: (error: Error) => {
       toast({
@@ -275,10 +282,30 @@ export function CanvasImportDialog({
                 Enter your institution's Canvas domain (without https://)
               </p>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="access-token">Canvas Access Token</Label>
+              <Input
+                id="access-token"
+                type="password"
+                placeholder="Paste your access token here"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+              />
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>To create an access token:</p>
+                <ol className="list-decimal list-inside ml-2 space-y-0.5">
+                  <li>Go to Canvas → Account → Settings</li>
+                  <li>Scroll to "Approved Integrations"</li>
+                  <li>Click "+ New Access Token"</li>
+                  <li>Enter a purpose (e.g., "ClassMate") and click "Generate Token"</li>
+                  <li>Copy and paste the token here</li>
+                </ol>
+              </div>
+            </div>
             <Button
               className="w-full"
-              onClick={() => connectMutation.mutate(canvasUrl)}
-              disabled={!canvasUrl.trim() || connectMutation.isPending}
+              onClick={() => connectMutation.mutate({ url: canvasUrl, token: accessToken })}
+              disabled={!canvasUrl.trim() || !accessToken.trim() || connectMutation.isPending}
             >
               {connectMutation.isPending ? (
                 <>

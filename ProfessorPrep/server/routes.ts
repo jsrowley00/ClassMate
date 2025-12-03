@@ -2930,15 +2930,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ================== CANVAS INTEGRATION ROUTES ==================
 
-  // Check if Canvas is configured
+  // Check Canvas connection status
   app.get('/api/canvas/status', isAuthenticated, async (req: any, res) => {
     try {
-      const { isCanvasConfigured } = await import('./canvas');
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
       res.json({
-        isConfigured: isCanvasConfigured(),
+        isConfigured: true,
         isConnected: Boolean(user?.canvasAccessToken && user?.canvasUrl),
         canvasUrl: user?.canvasUrl || null,
       });

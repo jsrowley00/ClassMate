@@ -291,7 +291,7 @@ export async function getCanvasCourseStudents(
     .map(e => ({
       id: e.user.id,
       name: e.user.name,
-      email: e.user.email || e.user.login_id || '',
+      email: (e.user.email || e.user.login_id || '').toLowerCase().trim(),
       enrollmentState: e.enrollment_state,
     }));
 }

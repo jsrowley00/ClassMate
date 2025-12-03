@@ -296,21 +296,12 @@ export async function getCanvasCourseStudents(
     `/courses/${courseId}/users?enrollment_type[]=student&include[]=email&per_page=100`
   );
   
-  // Debug: log the first user to see the structure
-  if (users.length > 0) {
-    console.log('Canvas user structure:', JSON.stringify(users[0], null, 2));
-  }
-  
   return users
     .filter(u => u.email || u.login_id)
-    .map(u => {
-      const email = u.email || u.login_id || '';
-      console.log(`User ${u.name}: email=${u.email}, login_id=${u.login_id}`);
-      return {
-        id: u.id,
-        name: u.name,
-        email: email.toLowerCase().trim(),
-        enrollmentState: 'active', // Course Users endpoint returns active students by default
-      };
-    });
+    .map(u => ({
+      id: u.id,
+      name: u.name,
+      email: (u.email || u.login_id || '').toLowerCase().trim(),
+      enrollmentState: 'active',
+    }));
 }

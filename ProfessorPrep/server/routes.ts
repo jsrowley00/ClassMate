@@ -219,8 +219,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (role === "professor" && !DEMO_ACCOUNT_IDS.includes(userId) && !isAdminEmail) {
-        // Check if user has professor access to switch back to professor
-        if (!existingUser?.hasProfessorAccess) {
+        // Allow first-time role selection (no role yet) OR users who already have professor access
+        // Only block if they have a role AND don't have professor access (trying to switch back without permission)
+        if (existingUser?.role && !existingUser?.hasProfessorAccess) {
           return res.status(403).json({ 
             message: "You don't have professor access. Please sign up as a professor first."
           });

@@ -275,23 +275,42 @@ export async function validateCanvasToken(
   }
 }
 
+interface CanvasUser {
+  id: number;
+  name: string;
+  sortable_name?: string;
+  email?: string;
+  login_id?: string;
+}
+
 export async function getCanvasCourseStudents(
   canvasUrl: string,
   accessToken: string,
   courseId: number
 ): Promise<CanvasStudent[]> {
-  const enrollments: CanvasEnrollment[] = await canvasApiRequest(
+  // Use the Course Users endpoint with include[]=email to get actual email addresses
+  // The Enrollments endpoint does NOT return email addresses
+  const users: CanvasUser[] = await canvasApiRequest(
     canvasUrl, 
     accessToken, 
-    `/courses/${courseId}/enrollments?type[]=StudentEnrollment&include[]=user&per_page=100`
+    `/courses/${courseId}/users?enrollment_type[]=student&include[]=email&per_page=100`
   );
   
-  return enrollments
-    .filter(e => e.user && (e.user.email || e.user.login_id))
-    .map(e => ({
-      id: e.user.id,
-      name: e.user.name,
-      email: (e.user.email || e.user.login_id || '').toLowerCase().trim(),
-      enrollmentState: e.enrollment_state,
-    }));
+  // Debug: log the first user to see the structure
+  if (users.length > 0) {
+    console.log('Canvas user structure:', JSON.stringify(users[0], null, 2));
+  }
+  
+  return users
+    .filter(u => u.email || u.login_id)
+    .map(u => {
+      const email = u.email || u.login_id || '';
+      console.log(`User ${u.name}: email=${u.email}, login_id=${u.login_id}`);
+      return {
+        id: u.id,
+        name: u.name,
+        email: email.toLowerCase().trim(),
+        enrollmentState: 'active', // Course Users endpoint returns active students by default
+      };
+    });
 }

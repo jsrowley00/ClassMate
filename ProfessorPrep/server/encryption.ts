@@ -5,8 +5,12 @@ const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
 function getEncryptionKey(): Buffer {
-  const key = process.env.TOKEN_ENCRYPTION_KEY || process.env.SESSION_SECRET || 'default-key-change-in-production';
-  return crypto.createHash('sha256').update(key).digest();
+  const key = process.env.TOKEN_ENCRYPTION_KEY || process.env.SESSION_SECRET || process.env.CLERK_SECRET_KEY;
+  if (!key) {
+    console.warn('Warning: No encryption key found. Using fallback key - set TOKEN_ENCRYPTION_KEY for production.');
+  }
+  const effectiveKey = key || crypto.randomBytes(32).toString('hex');
+  return crypto.createHash('sha256').update(effectiveKey).digest();
 }
 
 export function encryptToken(token: string): string {

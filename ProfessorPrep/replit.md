@@ -51,13 +51,14 @@ The design emphasizes a clean, educational interface with a professional blue pr
   - Users can re-access the tutorial anytime via the question mark (?) help icon in the header
   - Onboarding completion is tracked per role (hasSeenStudentOnboarding, hasSeenProfessorOnboarding fields in users table)
 - **Canvas LMS Integration**: Professors can import study materials directly from their Canvas courses:
-  - OAuth 2.0 authentication flow - professors connect by entering their school's Canvas URL and authorizing access
+  - Personal Access Token (PAT) authentication - professors self-service connect without needing school IT admin involvement
+  - Step-by-step instructions guide professors to create a Canvas access token from their Canvas settings
   - Browse Canvas courses where they are a teacher
   - View course files organized by Canvas modules
   - Select multiple files to import at once
   - Imported files are automatically processed (text extraction for DOCX/PPTX) and added to ClassMate modules
   - Supports PDF, Word docs, PowerPoint, images, and videos
-  - Requires Canvas developer credentials (CANVAS_CLIENT_ID, CANVAS_CLIENT_SECRET) to be configured
+  - Tokens are encrypted at rest using AES-256-GCM encryption
 
 ### System Design Choices
 - **Frontend**: React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI for components, and Tailwind CSS for styling.

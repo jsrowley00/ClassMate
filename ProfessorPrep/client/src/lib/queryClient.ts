@@ -40,6 +40,11 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
+  
+  if (res.status === 204) {
+    return null;
+  }
+  
   return await res.json();
 }
 

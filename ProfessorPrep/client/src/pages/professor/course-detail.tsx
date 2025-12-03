@@ -35,11 +35,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ArrowLeft, Upload, FileText, File, Image as ImageIcon, Trash2, Video, UserPlus, X, FolderPlus, Folder, Presentation, BarChart3, TrendingDown, Users, ClipboardList, ChevronDown, Pencil, CalendarIcon } from "lucide-react";
+import { ArrowLeft, Upload, FileText, File, Image as ImageIcon, Trash2, Video, UserPlus, X, FolderPlus, Folder, Presentation, BarChart3, TrendingDown, Users, ClipboardList, ChevronDown, Pencil, CalendarIcon, Download } from "lucide-react";
 import { Link, useParams, useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Course, CourseMaterial, User, CourseModule } from "@shared/schema";
 import { StudentAnalyticsDialog } from "@/components/StudentAnalyticsDialog";
+import { CanvasImportDialog } from "@/components/CanvasImportDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -116,6 +117,7 @@ export default function CourseDetail() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedStudentName, setSelectedStudentName] = useState<string>("");
   const [studentAnalyticsOpen, setStudentAnalyticsOpen] = useState(false);
+  const [canvasImportOpen, setCanvasImportOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -1303,26 +1305,43 @@ export default function CourseDetail() {
               </select>
             </div>
           )}
-          <div className="border-2 border-dashed rounded-md p-6 text-center">
-            <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-4" />
-            <div className="space-y-2">
-              <label htmlFor="file-upload" className="cursor-pointer">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="border-2 border-dashed rounded-md p-6 text-center">
+              <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-4" />
+              <div className="space-y-2">
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <span className="text-sm text-primary hover:underline">
+                    Choose files
+                  </span>
+                  <Input
+                    id="file-upload"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.mp4,.mov,.avi,.webm"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    data-testid="input-file-upload"
+                  />
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Supports PDF, Word, PowerPoint, image, and video files
+                </p>
+              </div>
+            </div>
+            
+            <div 
+              className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
+              onClick={() => setCanvasImportOpen(true)}
+            >
+              <Download className="h-8 w-8 text-muted-foreground mx-auto mb-4" />
+              <div className="space-y-2">
                 <span className="text-sm text-primary hover:underline">
-                  Choose files
+                  Import from Canvas
                 </span>
-                <Input
-                  id="file-upload"
-                  type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.mp4,.mov,.avi,.webm"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  data-testid="input-file-upload"
-                />
-              </label>
-              <p className="text-xs text-muted-foreground">
-                Supports PDF, Word, PowerPoint, image, and video files
-              </p>
+                <p className="text-xs text-muted-foreground">
+                  Connect to your Canvas LMS and import course materials
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1785,6 +1804,19 @@ export default function CourseDetail() {
           courseId={id}
           studentId={selectedStudentId}
           studentName={selectedStudentName}
+        />
+      )}
+
+      {/* Canvas Import Dialog */}
+      {id && (
+        <CanvasImportDialog
+          isOpen={canvasImportOpen}
+          onClose={() => setCanvasImportOpen(false)}
+          classmateCourseId={id}
+          classmateModuleId={selectedModuleId}
+          onImportComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/courses", id, "materials"] });
+          }}
         />
       )}
     </div>

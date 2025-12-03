@@ -46,12 +46,8 @@ export default function StudentDashboard() {
   }, [isAuthenticated, authLoading, toast]);
 
   useEffect(() => {
-    if (user && !user.hasSeenStudentOnboarding) {
-      const hasShownThisSession = sessionStorage.getItem('student-onboarding-shown');
-      if (!hasShownThisSession) {
-        sessionStorage.setItem('student-onboarding-shown', 'true');
-        setShowOnboarding(true);
-      }
+    if (user && user.hasSeenStudentOnboarding === false) {
+      setShowOnboarding(true);
     }
   }, [user]);
 

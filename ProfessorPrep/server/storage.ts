@@ -173,6 +173,8 @@ export class DatabaseStorage implements IStorage {
           profileImageUrl: userData.profileImageUrl,
           role: userData.role || existingUserById.role,
           hasProfessorAccess: userData.hasProfessorAccess ?? existingUserById.hasProfessorAccess,
+          hasSeenStudentOnboarding: userData.hasSeenStudentOnboarding ?? existingUserById.hasSeenStudentOnboarding,
+          hasSeenProfessorOnboarding: userData.hasSeenProfessorOnboarding ?? existingUserById.hasSeenProfessorOnboarding,
           updatedAt: new Date(),
         })
         .where(eq(users.id, userData.id))

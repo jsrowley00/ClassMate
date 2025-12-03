@@ -31,12 +31,8 @@ export default function ProfessorDashboard() {
   }, [isAuthenticated, authLoading, toast]);
 
   useEffect(() => {
-    if (user && !user.hasSeenProfessorOnboarding) {
-      const hasShownThisSession = sessionStorage.getItem('professor-onboarding-shown');
-      if (!hasShownThisSession) {
-        sessionStorage.setItem('professor-onboarding-shown', 'true');
-        setShowOnboarding(true);
-      }
+    if (user && user.hasSeenProfessorOnboarding === false) {
+      setShowOnboarding(true);
     }
   }, [user]);
 

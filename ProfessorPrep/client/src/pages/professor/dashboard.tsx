@@ -16,7 +16,6 @@ export default function ProfessorDashboard() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const queryClient = useQueryClient();
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -32,13 +31,14 @@ export default function ProfessorDashboard() {
   }, [isAuthenticated, authLoading, toast]);
 
   useEffect(() => {
-    if (user && !onboardingChecked) {
-      setOnboardingChecked(true);
-      if (!user.hasSeenProfessorOnboarding) {
+    if (user && !user.hasSeenProfessorOnboarding) {
+      const hasShownThisSession = sessionStorage.getItem('professor-onboarding-shown');
+      if (!hasShownThisSession) {
+        sessionStorage.setItem('professor-onboarding-shown', 'true');
         setShowOnboarding(true);
       }
     }
-  }, [user, onboardingChecked]);
+  }, [user]);
 
   useEffect(() => {
     const handleShowOnboarding = () => setShowOnboarding(true);

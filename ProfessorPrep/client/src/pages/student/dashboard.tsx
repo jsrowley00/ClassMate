@@ -31,7 +31,6 @@ export default function StudentDashboard() {
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomDescription, setNewRoomDescription] = useState("");
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -47,13 +46,14 @@ export default function StudentDashboard() {
   }, [isAuthenticated, authLoading, toast]);
 
   useEffect(() => {
-    if (user && !onboardingChecked) {
-      setOnboardingChecked(true);
-      if (!user.hasSeenStudentOnboarding) {
+    if (user && !user.hasSeenStudentOnboarding) {
+      const hasShownThisSession = sessionStorage.getItem('student-onboarding-shown');
+      if (!hasShownThisSession) {
+        sessionStorage.setItem('student-onboarding-shown', 'true');
         setShowOnboarding(true);
       }
     }
-  }, [user, onboardingChecked]);
+  }, [user]);
 
   useEffect(() => {
     const handleShowOnboarding = () => setShowOnboarding(true);

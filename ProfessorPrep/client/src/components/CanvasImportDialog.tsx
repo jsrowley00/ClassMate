@@ -245,7 +245,7 @@ export function CanvasImportDialog({
         description: `Successfully invited ${data.enrolled?.length || selectedStudentEmails.size} student(s)`,
       });
       setSelectedStudentEmails(new Set());
-      queryClient.invalidateQueries({ queryKey: [`/api/courses/${classmateCourseId}/enrollments`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/courses", classmateCourseId, "students"] });
     },
     onError: (error: Error) => {
       toast({

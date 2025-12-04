@@ -117,6 +117,7 @@ export interface IStorage {
   getFlashcardSets(studentId: string, courseId?: string): Promise<FlashcardSet[]>;
   getFlashcardSet(id: string): Promise<FlashcardSet | undefined>;
   createFlashcardSet(set: InsertFlashcardSet): Promise<FlashcardSet>;
+  updateFlashcardSet(id: string, data: Partial<FlashcardSet>): Promise<FlashcardSet>;
   deleteFlashcardSet(id: string): Promise<void>;
   getFlashcards(setId: string): Promise<Flashcard[]>;
   createFlashcard(card: InsertFlashcard): Promise<Flashcard>;
@@ -705,6 +706,15 @@ export class DatabaseStorage implements IStorage {
 
   async createFlashcardSet(setData: InsertFlashcardSet): Promise<FlashcardSet> {
     const [set] = await db.insert(flashcardSets).values(setData).returning();
+    return set;
+  }
+
+  async updateFlashcardSet(id: string, data: Partial<FlashcardSet>): Promise<FlashcardSet> {
+    const [set] = await db
+      .update(flashcardSets)
+      .set(data)
+      .where(eq(flashcardSets.id, id))
+      .returning();
     return set;
   }
 

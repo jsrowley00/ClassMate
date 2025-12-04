@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Plus, BookOpen, Trash2, GraduationCap, RotateCw, X, FolderPlus, ChevronDown, Target } from "lucide-react";
+import { Loader2, Plus, BookOpen, Trash2, Pencil, GraduationCap, RotateCw, X, FolderPlus, ChevronDown, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
@@ -46,6 +46,9 @@ export default function Flashcards() {
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [selectAllModules, setSelectAllModules] = useState(true);
   const [isObjectivesExpanded, setIsObjectivesExpanded] = useState(true);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingSet, setEditingSet] = useState<FlashcardSet | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   const { data: course } = useQuery<Course>({
     queryKey: [`/api/courses/${id}`],
@@ -112,6 +115,47 @@ export default function Flashcards() {
       });
     },
   });
+
+  const editMutation = useMutation({
+    mutationFn: async ({ setId, title }: { setId: string; title: string }) => {
+      return await apiRequest("PATCH", `/api/flashcards/sets/${setId}`, { title });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/courses/${id}/flashcards`] });
+      setIsEditDialogOpen(false);
+      setEditingSet(null);
+      setEditTitle("");
+      toast({
+        title: "Updated",
+        description: "Flashcard set has been renamed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: error.message || "Failed to update flashcard set.",
+      });
+    },
+  });
+
+  const handleEditSet = (set: FlashcardSet) => {
+    setEditingSet(set);
+    setEditTitle(set.title);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingSet || !editTitle.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Title required",
+        description: "Please enter a title for your flashcard set.",
+      });
+      return;
+    }
+    editMutation.mutate({ setId: editingSet.id, title: editTitle.trim() });
+  };
 
   const handleGenerateFlashcards = () => {
     if (!title.trim()) {
@@ -399,15 +443,25 @@ export default function Flashcards() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span className="truncate">{set.title}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteMutation.mutate(set.id)}
-                    disabled={deleteMutation.isPending}
-                    data-testid={`button-delete-${set.id}`}
-                  >
-                    <Trash2 className="w-4 h-4 text-muted-foreground" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditSet(set)}
+                      data-testid={`button-edit-${set.id}`}
+                    >
+                      <Pencil className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteMutation.mutate(set.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-${set.id}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </div>
                 </CardTitle>
                 <CardDescription>
                   Created {new Date(set.createdAt).toLocaleDateString()}
@@ -425,6 +479,53 @@ export default function Flashcards() {
           ))}
         </div>
       )}
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Flashcard Set</DialogTitle>
+            <DialogDescription>
+              Change the name of your flashcard set.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Enter a new title"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                setEditingSet(null);
+                setEditTitle("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={editMutation.isPending || !editTitle.trim()}
+            >
+              {editMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

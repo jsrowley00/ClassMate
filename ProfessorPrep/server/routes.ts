@@ -2734,6 +2734,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update a flashcard set (rename)
+  app.patch('/api/flashcards/sets/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { title } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!title || typeof title !== 'string' || !title.trim()) {
+        return res.status(400).json({ message: "Title is required" });
+      }
+
+      const flashcardSet = await storage.getFlashcardSet(id);
+      if (!flashcardSet) {
+        return res.status(404).json({ message: "Flashcard set not found" });
+      }
+
+      // Verify the set belongs to the user
+      if (flashcardSet.studentId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedSet = await storage.updateFlashcardSet(id, { title: title.trim() });
+      res.json(updatedSet);
+    } catch (error) {
+      console.error("Error updating flashcard set:", error);
+      res.status(500).json({ message: "Failed to update flashcard set" });
+    }
+  });
+
   // Learning objectives routes
   // Auto-generate objectives for all modules in a course that have materials
   app.post('/api/courses/:id/learning-objectives/generate-all', isAuthenticated, objectivesLimiter, async (req: any, res) => {

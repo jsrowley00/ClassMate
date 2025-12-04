@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Folder, Image, Video, File, Download, Link2, Unlink, ChevronRight, ChevronDown, Loader2, Users, UserPlus } from "lucide-react";
+import { FileText, Folder, Image, Video, File, Download, Link2, Unlink, ChevronRight, ChevronDown, Loader2, Users, UserPlus, FolderTree, Check } from "lucide-react";
 
 interface CanvasFile {
   id: number;
@@ -70,8 +70,21 @@ export function CanvasImportDialog({
   const [selectedFileIds, setSelectedFileIds] = useState<Set<number>>(new Set());
   const [selectedStudentEmails, setSelectedStudentEmails] = useState<Set<string>>(new Set());
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
-  const [step, setStep] = useState<"status" | "connect" | "courses" | "files">("status");
+  const [step, setStep] = useState<"status" | "connect" | "courses" | "structure-choice" | "files">("status");
   const [activeTab, setActiveTab] = useState<"files" | "students">("files");
+  
+  // Structure import state
+  const [importedStructure, setImportedStructure] = useState<{
+    modules: Array<{
+      canvasModuleId: number;
+      classmateModuleId: string;
+      name: string;
+      fileCount: number;
+      files: Array<{ contentId: number; title: string }>;
+    }>;
+    moduleMapping: Record<number, string>;
+  } | null>(null);
+  const [structureImported, setStructureImported] = useState(false);
 
   const { data: canvasStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery<{
     isConfigured: boolean;
@@ -146,6 +159,8 @@ export function CanvasImportDialog({
       setExpandedModules(new Set());
       setStep("status");
       setActiveTab("files");
+      setImportedStructure(null);
+      setStructureImported(false);
     }
   }, [isOpen]);
 
@@ -208,9 +223,64 @@ export function CanvasImportDialog({
     },
   });
 
+  const importStructureMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      const response = await fetch("/api/canvas/import-structure", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          canvasCourseId: selectedCourse?.id,
+          classmateCourseId,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to import structure");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setImportedStructure(data);
+      setStructureImported(true);
+      // Expand all modules so user can see files
+      setExpandedModules(new Set(data.modules.map((m: any) => m.canvasModuleId)));
+      toast({
+        title: "Module structure imported",
+        description: `Created ${data.modules.length} module(s) in ClassMate. Now select which files to import.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/courses", classmateCourseId] });
+      setStep("files");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Import failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const importMutation = useMutation({
     mutationFn: async () => {
       const token = await getToken();
+      
+      // Build file-to-module mapping if structure was imported
+      let fileModuleMapping: Record<string, string> | undefined;
+      if (structureImported && importedStructure) {
+        fileModuleMapping = {};
+        for (const mod of importedStructure.modules) {
+          for (const file of mod.files) {
+            if (file.contentId && selectedFileIds.has(file.contentId)) {
+              fileModuleMapping[file.contentId.toString()] = mod.classmateModuleId;
+            }
+          }
+        }
+      }
+      
       const response = await fetch("/api/canvas/import", {
         method: "POST",
         headers: {
@@ -220,7 +290,8 @@ export function CanvasImportDialog({
         body: JSON.stringify({
           fileIds: Array.from(selectedFileIds),
           classmateCourseId,
-          classmateModuleId,
+          classmateModuleId: structureImported ? null : classmateModuleId,
+          fileModuleMapping,
         }),
       });
       if (!response.ok) {
@@ -232,7 +303,7 @@ export function CanvasImportDialog({
     onSuccess: (data) => {
       toast({
         title: "Import complete",
-        description: `Successfully imported ${data.imported.length} file(s)`,
+        description: `Successfully imported ${data.imported.length} file(s)${structureImported ? " into their respective modules" : ""}`,
       });
       onImportComplete();
       onClose();
@@ -461,7 +532,7 @@ export function CanvasImportDialog({
                       className="w-full p-3 border rounded-md hover:bg-muted/50 text-left transition-colors flex items-center justify-between"
                       onClick={() => {
                         setSelectedCourse(course);
-                        setStep("files");
+                        setStep("structure-choice");
                       }}
                     >
                       <div>
@@ -483,6 +554,72 @@ export function CanvasImportDialog({
       );
     }
 
+    if (step === "structure-choice") {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedCourse(null);
+                setStep("courses");
+              }}
+            >
+              Back to Courses
+            </Button>
+            <span className="text-muted-foreground">/</span>
+            <span className="font-medium">{selectedCourse?.name}</span>
+          </div>
+
+          <div className="text-center">
+            <h4 className="font-medium text-lg mb-2">Import Module Structure?</h4>
+            <p className="text-sm text-muted-foreground mb-6">
+              Would you like to recreate your Canvas module structure in ClassMate?
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            <button
+              className="p-4 border rounded-lg hover:bg-muted/50 text-left transition-colors flex items-start gap-4"
+              onClick={() => importStructureMutation.mutate()}
+              disabled={importStructureMutation.isPending}
+            >
+              <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FolderTree className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium flex items-center gap-2">
+                  Import Module Structure
+                  {importStructureMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Create ClassMate modules that match your Canvas modules. Files will be imported into their corresponding modules.
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
+            </button>
+
+            <button
+              className="p-4 border rounded-lg hover:bg-muted/50 text-left transition-colors flex items-start gap-4"
+              onClick={() => setStep("files")}
+            >
+              <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+                <File className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium">Skip Structure, Just Import Files</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Browse and select individual files without recreating the module structure.
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (step === "files") {
       return (
         <div className="space-y-4">
@@ -496,12 +633,20 @@ export function CanvasImportDialog({
                 setSelectedStudentEmails(new Set());
                 setStep("courses");
                 setActiveTab("files");
+                setImportedStructure(null);
+                setStructureImported(false);
               }}
             >
               Back to Courses
             </Button>
             <span className="text-muted-foreground">/</span>
             <span className="font-medium">{selectedCourse?.name}</span>
+            {structureImported && (
+              <Badge variant="secondary" className="ml-2">
+                <Check className="h-3 w-3 mr-1" />
+                Modules Created
+              </Badge>
+            )}
           </div>
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "files" | "students")}>

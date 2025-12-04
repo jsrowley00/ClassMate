@@ -3238,12 +3238,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import module structure from Canvas to ClassMate
+  app.post('/api/canvas/import-structure', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { canvasCourseId, classmateCourseId } = req.body;
+
+      if (!user?.canvasAccessToken || !user?.canvasUrl) {
+        return res.status(400).json({ message: "Canvas not connected" });
+      }
+
+      if (!canvasCourseId || !classmateCourseId) {
+        return res.status(400).json({ message: "Canvas course ID and ClassMate course ID are required" });
+      }
+
+      const { decryptToken } = await import('./encryption');
+      const { getCanvasModules, getCanvasModuleItems } = await import('./canvas');
+      const accessToken = decryptToken(user.canvasAccessToken);
+      
+      // Get Canvas modules
+      const canvasModules = await getCanvasModules(user.canvasUrl, accessToken, canvasCourseId);
+      
+      // Sort by position
+      canvasModules.sort((a, b) => a.position - b.position);
+      
+      // Create mapping of Canvas module ID to ClassMate module ID
+      const moduleMapping: Record<number, string> = {};
+      const createdModules = [];
+
+      for (const canvasModule of canvasModules) {
+        // Create a ClassMate module with the same name
+        const classmateModule = await storage.createCourseModule({
+          courseId: classmateCourseId,
+          name: canvasModule.name,
+          description: null,
+          parentModuleId: null,
+        });
+        
+        moduleMapping[canvasModule.id] = classmateModule.id;
+        
+        // Get module items to find files
+        const items = await getCanvasModuleItems(user.canvasUrl, accessToken, canvasCourseId, canvasModule.id);
+        const fileItems = items.filter(item => item.type === "File" && item.content_id);
+        
+        createdModules.push({
+          canvasModuleId: canvasModule.id,
+          classmateModuleId: classmateModule.id,
+          name: canvasModule.name,
+          fileCount: fileItems.length,
+          files: fileItems.map(item => ({
+            contentId: item.content_id,
+            title: item.title
+          }))
+        });
+      }
+
+      res.json({
+        success: true,
+        modules: createdModules,
+        moduleMapping,
+      });
+    } catch (error: any) {
+      console.error("Error importing Canvas structure:", error);
+      res.status(500).json({ message: error.message || "Failed to import structure" });
+    }
+  });
+
   // Import files from Canvas to ClassMate
+  // Supports both single module import and mapped import (files to their respective modules)
   app.post('/api/canvas/import', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      const { fileIds, classmateModuleId, classmateCourseId } = req.body;
+      const { fileIds, classmateModuleId, classmateCourseId, fileModuleMapping } = req.body;
+      // fileModuleMapping: optional Record<string (fileId), string (classmateModuleId)> for mapped imports
 
       if (!user?.canvasAccessToken || !user?.canvasUrl) {
         return res.status(400).json({ message: "Canvas not connected" });
@@ -3262,6 +3331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const accessToken = decryptToken(user.canvasAccessToken);
       const importedFiles = [];
       const errors = [];
+      const modulesWithNewContent = new Set<string>();
 
       for (const fileId of fileIds) {
         try {
@@ -3304,26 +3374,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
+          // Determine target module: use mapping if provided, otherwise use single module
+          const targetModuleId = fileModuleMapping?.[fileId.toString()] || classmateModuleId || null;
+
           // Create course material
           const material = await storage.createCourseMaterial({
             courseId: classmateCourseId,
-            moduleId: classmateModuleId || null,
+            moduleId: targetModuleId,
             fileName: filename,
             fileType,
             fileUrl: dataUrl,
             extractedText,
           });
 
-          importedFiles.push({ filename, materialId: material.id });
+          importedFiles.push({ filename, materialId: material.id, moduleId: targetModuleId });
 
-          // Auto-generate learning objectives if added to a module
-          if (classmateModuleId) {
-            autoGenerateLearningObjectives(classmateModuleId);
+          // Track modules that got new content
+          if (targetModuleId) {
+            modulesWithNewContent.add(targetModuleId);
           }
         } catch (fileError: any) {
           console.error(`Error importing file ${fileId}:`, fileError);
           errors.push({ fileId, error: fileError.message });
         }
+      }
+
+      // Auto-generate learning objectives for all modules that got new content
+      for (const moduleId of Array.from(modulesWithNewContent)) {
+        autoGenerateLearningObjectives(moduleId);
       }
 
       res.json({

@@ -111,7 +111,7 @@ export function CanvasImportDialog({
 
   const { data: studentsData, isLoading: studentsLoading } = useQuery<CanvasStudent[]>({
     queryKey: ["/api/canvas/courses", selectedCourse?.id, "students"],
-    enabled: isOpen && selectedCourse !== null && step === "files" && activeTab === "students",
+    enabled: isOpen && selectedCourse !== null && (step === "files" || step === "module-selection") && activeTab === "students",
   });
 
   interface EnrolledStudent {
@@ -128,7 +128,7 @@ export function CanvasImportDialog({
 
   const { data: enrolledStudentsData } = useQuery<{ students: EnrolledStudent[]; invitations: CourseInvitation[] }>({
     queryKey: ["/api/courses", classmateCourseId, "students"],
-    enabled: isOpen && step === "files" && activeTab === "students",
+    enabled: isOpen && (step === "files" || step === "module-selection") && activeTab === "students",
   });
 
   const alreadyEnrolledEmails = new Set([
@@ -640,6 +640,21 @@ export function CanvasImportDialog({
         return module.items.filter(item => item.type === "File" && item.content_id);
       };
 
+      // Get files that are not in any module (extra files)
+      const getExtraFiles = () => {
+        const moduleFileIds = new Set<number>();
+        courseData?.modules.forEach(module => {
+          module.items.forEach(item => {
+            if (item.type === "File" && item.content_id) {
+              moduleFileIds.add(item.content_id);
+            }
+          });
+        });
+        return courseData?.files.filter(f => !moduleFileIds.has(f.id)) || [];
+      };
+
+      const extraFiles = getExtraFiles();
+
       // Toggle module selection (only toggles the module, not files)
       const toggleModuleSelection = (moduleId: number) => {
         const newSelectedModules = new Set(selectedModuleIds);
@@ -671,7 +686,7 @@ export function CanvasImportDialog({
         return files.filter(f => f.content_id && selectedFileIds.has(f.content_id)).length;
       };
 
-      // Select all modules and files
+      // Select all modules and files (including extra files)
       const selectAll = () => {
         const newModules = new Set<number>();
         const newFiles = new Set<number>();
@@ -684,6 +699,8 @@ export function CanvasImportDialog({
             });
           }
         });
+        // Also select extra files
+        extraFiles.forEach(f => newFiles.add(f.id));
         setSelectedModuleIds(newModules);
         setSelectedFileIds(newFiles);
       };
@@ -694,9 +711,10 @@ export function CanvasImportDialog({
         setSelectedFileIds(new Set());
       };
 
-      // Count totals
+      // Count totals (including extra files)
       const totalModulesWithFiles = courseData?.modules.filter(m => getModuleFiles(m).length > 0).length || 0;
-      const totalFiles = courseData?.modules.reduce((sum, m) => sum + getModuleFiles(m).length, 0) || 0;
+      const totalModuleFiles = courseData?.modules.reduce((sum, m) => sum + getModuleFiles(m).length, 0) || 0;
+      const totalFiles = totalModuleFiles + extraFiles.length;
 
       return (
         <div className="space-y-4">
@@ -716,128 +734,251 @@ export function CanvasImportDialog({
             <span className="font-medium">{selectedCourse?.name}</span>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium">Select Modules & Files</h4>
-              <p className="text-sm text-muted-foreground">
-                {selectedModuleIds.size} of {totalModulesWithFiles} modules, {selectedFileIds.size} of {totalFiles} files selected
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={selectAll}>
-                Select All
-              </Button>
-              <Button variant="outline" size="sm" onClick={deselectAll}>
-                Clear
-              </Button>
-            </div>
-          </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "files" | "students")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="files" className="flex items-center gap-2">
+                <File className="h-4 w-4" />
+                Modules & Files
+              </TabsTrigger>
+              <TabsTrigger value="students" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Students
+              </TabsTrigger>
+            </TabsList>
 
-          {filesLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : courseData?.modules && courseData.modules.length > 0 ? (
-            <ScrollArea className="h-[350px] border rounded-md p-2">
-              <div className="space-y-1">
-                {courseData.modules.map((module) => {
-                  const files = getModuleFiles(module);
-                  if (files.length === 0) return null;
-                  
-                  const isExpanded = expandedModules.has(module.id);
-                  const isModuleSelected = selectedModuleIds.has(module.id);
-                  const selectedFilesCount = countSelectedFilesInModule(files);
-                  
-                  return (
-                    <div key={module.id} className="border rounded-md">
-                      <div className="flex items-center gap-2 p-3 hover:bg-muted/50">
-                        <Checkbox
-                          checked={isModuleSelected}
-                          onCheckedChange={() => toggleModuleSelection(module.id)}
-                        />
-                        <button
-                          className="flex items-center gap-2 flex-1 text-left"
-                          onClick={() => toggleModuleExpansion(module.id)}
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                          <Folder className="h-4 w-4 text-blue-500" />
-                          <span className="font-medium">{module.name}</span>
-                          <Badge variant="secondary" className="ml-auto">
-                            {selectedFilesCount}/{files.length}
-                          </Badge>
-                        </button>
-                      </div>
+            <TabsContent value="files" className="mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="font-medium">Select Modules & Files</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedModuleIds.size} of {totalModulesWithFiles} modules, {selectedFileIds.size} of {totalFiles} files selected
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={selectAll}>
+                    Select All
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={deselectAll}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+
+              {filesLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : (courseData?.modules && courseData.modules.length > 0) || extraFiles.length > 0 ? (
+                <ScrollArea className="h-[300px] border rounded-md p-2">
+                  <div className="space-y-1">
+                    {courseData?.modules.map((module) => {
+                      const files = getModuleFiles(module);
+                      if (files.length === 0) return null;
                       
-                      {isExpanded && (
-                        <div className="border-t bg-muted/20 p-2 space-y-1">
-                          {files.map((item) => {
-                            if (!item.content_id) return null;
-                            const isSelected = selectedFileIds.has(item.content_id);
-                            
+                      const isExpanded = expandedModules.has(module.id);
+                      const isModuleSelected = selectedModuleIds.has(module.id);
+                      const selectedFilesCount = countSelectedFilesInModule(files);
+                      
+                      return (
+                        <div key={module.id} className="border rounded-md">
+                          <div className="flex items-center gap-2 p-3 hover:bg-muted/50">
+                            <Checkbox
+                              checked={isModuleSelected}
+                              onCheckedChange={() => toggleModuleSelection(module.id)}
+                            />
+                            <button
+                              className="flex items-center gap-2 flex-1 text-left"
+                              onClick={() => toggleModuleExpansion(module.id)}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                              <Folder className="h-4 w-4 text-blue-500" />
+                              <span className="font-medium">{module.name}</span>
+                              <Badge variant="secondary" className="ml-auto">
+                                {selectedFilesCount}/{files.length}
+                              </Badge>
+                            </button>
+                          </div>
+                          
+                          {isExpanded && (
+                            <div className="border-t bg-muted/20 p-2 space-y-1">
+                              {files.map((item) => {
+                                if (!item.content_id) return null;
+                                const isSelected = selectedFileIds.has(item.content_id);
+                                
+                                return (
+                                  <label
+                                    key={item.id}
+                                    className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                                  >
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() => toggleFileInModule(item.content_id!)}
+                                    />
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{item.title}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {extraFiles.length > 0 && (
+                      <div className="border rounded-md mt-2">
+                        <div className="flex items-center gap-2 p-3 bg-muted/30">
+                          <File className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium text-muted-foreground">Extra Files (not in modules)</span>
+                          <Badge variant="outline" className="ml-auto">
+                            {extraFiles.filter(f => selectedFileIds.has(f.id)).length}/{extraFiles.length}
+                          </Badge>
+                        </div>
+                        <div className="border-t p-2 space-y-1">
+                          {extraFiles.map((file) => {
+                            const isSelected = selectedFileIds.has(file.id);
                             return (
                               <label
-                                key={item.id}
+                                key={file.id}
                                 className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
                               >
                                 <Checkbox
                                   checked={isSelected}
-                                  onCheckedChange={() => toggleFileInModule(item.content_id!)}
+                                  onCheckedChange={() => toggleFileInModule(file.id)}
                                 />
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">{item.title}</span>
+                                {getFileIcon(file.content_type, file.filename)}
+                                <span className="text-sm flex-1 truncate">{file.display_name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatFileSize(file.size)}
+                                </span>
                               </label>
                             );
                           })}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No modules with files found in this course.</p>
-            </div>
-          )}
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No modules or files found in this course.</p>
+                </div>
+              )}
 
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSelectedModuleIds(new Set());
-                setSelectedFileIds(new Set());
-                setStep("structure-choice");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => importStructureMutation.mutate()}
-              disabled={(selectedModuleIds.size === 0 && selectedFileIds.size === 0) || importStructureMutation.isPending}
-            >
-              {importStructureMutation.isPending ? (
+              <div className="flex justify-end gap-2 pt-2 border-t mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedModuleIds(new Set());
+                    setSelectedFileIds(new Set());
+                    setStep("structure-choice");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => importStructureMutation.mutate()}
+                  disabled={(selectedModuleIds.size === 0 && selectedFileIds.size === 0) || importStructureMutation.isPending}
+                >
+                  {importStructureMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Import Selected
+                      {selectedModuleIds.size > 0 && ` (${selectedModuleIds.size} modules`}
+                      {selectedFileIds.size > 0 && `${selectedModuleIds.size > 0 ? ', ' : ' ('}${selectedFileIds.size} files`}
+                      {(selectedModuleIds.size > 0 || selectedFileIds.size > 0) && ')'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="students" className="mt-4">
+              {studentsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : availableCanvasStudents.length > 0 ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Importing...
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-muted-foreground">
+                      {availableCanvasStudents.length} student(s) available to invite
+                      {studentsData && studentsData.length > availableCanvasStudents.length && (
+                        <span className="text-xs ml-1">
+                          ({studentsData.length - availableCanvasStudents.length} already enrolled/invited)
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={selectAllStudents}>
+                        Select All
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={deselectAllStudents}>
+                        Deselect All
+                      </Button>
+                    </div>
+                  </div>
+                  <ScrollArea className="h-[250px] border rounded-md p-2">
+                    {availableCanvasStudents.map((student) => (
+                      <div
+                        key={student.id}
+                        className="flex items-center gap-2 p-2 hover:bg-muted/50 rounded-md cursor-pointer"
+                        onClick={() => toggleStudentSelection(student.email)}
+                      >
+                        <Checkbox
+                          checked={selectedStudentEmails.has(student.email)}
+                          onCheckedChange={() => toggleStudentSelection(student.email)}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{student.name}</p>
+                          <p className="text-sm text-muted-foreground">{student.email}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                  <div className="flex items-center justify-between pt-2 border-t mt-2">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedStudentEmails.size} student(s) selected
+                    </p>
+                    <Button
+                      onClick={() => inviteStudentsMutation.mutate()}
+                      disabled={selectedStudentEmails.size === 0 || inviteStudentsMutation.isPending}
+                    >
+                      {inviteStudentsMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Inviting...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Invite Selected
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </>
               ) : (
-                <>
-                  <Download className="mr-2 h-4 w-4" />
-                  Import Selected
-                  {selectedModuleIds.size > 0 && ` (${selectedModuleIds.size} modules`}
-                  {selectedFileIds.size > 0 && `${selectedModuleIds.size > 0 ? ', ' : ' ('}${selectedFileIds.size} files`}
-                  {(selectedModuleIds.size > 0 || selectedFileIds.size > 0) && ')'}
-                </>
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No students available to invite.</p>
+                  <p className="text-sm mt-1">All Canvas students are already enrolled or invited.</p>
+                </div>
               )}
-            </Button>
-          </div>
+            </TabsContent>
+          </Tabs>
         </div>
       );
     }

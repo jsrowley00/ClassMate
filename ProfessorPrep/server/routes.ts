@@ -3376,7 +3376,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Extract text if possible
             let extractedText = '';
-            if (ext === 'docx') {
+            if (ext === 'pdf') {
+              try {
+                const { PDFParse } = await import('pdf-parse');
+                const parser = new PDFParse({ data: buffer });
+                const result = await parser.getText();
+                extractedText = result.text || '';
+                await parser.destroy();
+              } catch (e) {
+                console.error('Error extracting text from pdf:', e);
+              }
+            } else if (ext === 'docx') {
               try {
                 const mammoth = await import('mammoth');
                 const result = await mammoth.extractRawText({ buffer });
@@ -3491,7 +3501,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Extract text for supported file types
           let extractedText: string | null = null;
-          if (fileType === 'docx') {
+          if (fileType === 'pdf') {
+            try {
+              const { PDFParse } = await import('pdf-parse');
+              const parser = new PDFParse({ data: buffer });
+              const result = await parser.getText();
+              extractedText = result.text || '';
+              await parser.destroy();
+            } catch (e) {
+              console.error(`Error extracting text from ${filename}:`, e);
+            }
+          } else if (fileType === 'docx') {
             try {
               const result = await mammoth.extractRawText({ buffer });
               extractedText = result.value;

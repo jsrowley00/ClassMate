@@ -4,9 +4,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ChevronLeft, ChevronRight, RotateCw, Check, X } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, RotateCw, Check, X, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -38,10 +42,116 @@ export default function FlashcardStudy() {
   const { toast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
+  const [cardFront, setCardFront] = useState("");
+  const [cardBack, setCardBack] = useState("");
 
   const { data, isLoading, error, refetch } = useQuery<FlashcardData>({
     queryKey: [`/api/flashcards/sets/${setId}`],
   });
+
+  const addCardMutation = useMutation({
+    mutationFn: async (cardData: { front: string; back: string }) => {
+      return await apiRequest("POST", `/api/flashcards/sets/${setId}/cards`, cardData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/flashcards/sets/${setId}`] });
+      setIsAddDialogOpen(false);
+      setCardFront("");
+      setCardBack("");
+      toast({
+        title: "Card added!",
+        description: "Your flashcard has been added to the set.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to add card",
+        description: error.message || "Please try again.",
+      });
+    },
+  });
+
+  const editCardMutation = useMutation({
+    mutationFn: async ({ cardId, front, back }: { cardId: string; front: string; back: string }) => {
+      return await apiRequest("PATCH", `/api/flashcards/${cardId}`, { front, back });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/flashcards/sets/${setId}`] });
+      setIsEditDialogOpen(false);
+      setEditingCard(null);
+      setCardFront("");
+      setCardBack("");
+      toast({
+        title: "Card updated!",
+        description: "Your flashcard has been updated.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to update card",
+        description: error.message || "Please try again.",
+      });
+    },
+  });
+
+  const deleteCardMutation = useMutation({
+    mutationFn: async (cardId: string) => {
+      return await apiRequest("DELETE", `/api/flashcards/${cardId}`, undefined);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/flashcards/sets/${setId}`] });
+      if (data && currentIndex >= data.flashcards.length - 1 && currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+      }
+      toast({
+        title: "Card deleted",
+        description: "The flashcard has been removed from the set.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to delete card",
+        description: error.message || "Please try again.",
+      });
+    },
+  });
+
+  const handleAddCard = () => {
+    if (!cardFront.trim() || !cardBack.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Both sides required",
+        description: "Please enter content for both the front and back of the card.",
+      });
+      return;
+    }
+    addCardMutation.mutate({ front: cardFront.trim(), back: cardBack.trim() });
+  };
+
+  const handleEditCard = () => {
+    if (!editingCard || !cardFront.trim() || !cardBack.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Both sides required",
+        description: "Please enter content for both the front and back of the card.",
+      });
+      return;
+    }
+    editCardMutation.mutate({ cardId: editingCard.id, front: cardFront.trim(), back: cardBack.trim() });
+  };
+
+  const openEditDialog = (card: Flashcard) => {
+    setEditingCard(card);
+    setCardFront(card.front);
+    setCardBack(card.back);
+    setIsEditDialogOpen(true);
+  };
 
   const masteryMutation = useMutation({
     mutationFn: async ({ flashcardId, mastered }: { flashcardId: string; mastered: boolean }) => {
@@ -154,14 +264,28 @@ export default function FlashcardStudy() {
             Card {currentIndex + 1} of {data.flashcards.length}
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => navigate(`/student/courses/${courseId}/flashcards`)}
-          data-testid="button-back"
-        >
-          <ChevronLeft className="w-4 h-4 mr-2" />
-          Back to Sets
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCardFront("");
+              setCardBack("");
+              setIsAddDialogOpen(true);
+            }}
+            data-testid="button-add-card"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Card
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/student/courses/${courseId}/flashcards`)}
+            data-testid="button-back"
+          >
+            <ChevronLeft className="w-4 h-4 mr-2" />
+            Back to Sets
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -176,6 +300,31 @@ export default function FlashcardStudy() {
                 Mastered
               </Badge>
             )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openEditDialog(currentCard)}
+              data-testid="button-edit-card"
+            >
+              <Pencil className="w-4 h-4 mr-1" />
+              Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (confirm("Are you sure you want to delete this card?")) {
+                  deleteCardMutation.mutate(currentCard.id);
+                }
+              }}
+              disabled={deleteCardMutation.isPending}
+              data-testid="button-delete-card"
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Delete
+            </Button>
           </div>
         </div>
         <Progress value={progress} className="h-2" data-testid="progress-mastery" />
@@ -280,6 +429,126 @@ export default function FlashcardStudy() {
           <ChevronRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Flashcard</DialogTitle>
+            <DialogDescription>
+              Create your own flashcard to add to this set.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="card-front">Front (Question)</Label>
+              <Textarea
+                id="card-front"
+                value={cardFront}
+                onChange={(e) => setCardFront(e.target.value)}
+                placeholder="Enter the question or term..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="card-back">Back (Answer)</Label>
+              <Textarea
+                id="card-back"
+                value={cardBack}
+                onChange={(e) => setCardBack(e.target.value)}
+                placeholder="Enter the answer or definition..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddDialogOpen(false);
+                setCardFront("");
+                setCardBack("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddCard}
+              disabled={addCardMutation.isPending || !cardFront.trim() || !cardBack.trim()}
+            >
+              {addCardMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Card
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Flashcard</DialogTitle>
+            <DialogDescription>
+              Update the content of this flashcard.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-card-front">Front (Question)</Label>
+              <Textarea
+                id="edit-card-front"
+                value={cardFront}
+                onChange={(e) => setCardFront(e.target.value)}
+                placeholder="Enter the question or term..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-card-back">Back (Answer)</Label>
+              <Textarea
+                id="edit-card-back"
+                value={cardBack}
+                onChange={(e) => setCardBack(e.target.value)}
+                placeholder="Enter the answer or definition..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                setEditingCard(null);
+                setCardFront("");
+                setCardBack("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditCard}
+              disabled={editCardMutation.isPending || !cardFront.trim() || !cardBack.trim()}
+            >
+              {editCardMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

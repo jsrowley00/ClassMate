@@ -2710,6 +2710,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add a new flashcard to a set
+  app.post('/api/flashcards/sets/:setId/cards', isAuthenticated, async (req: any, res) => {
+    try {
+      const { setId } = req.params;
+      const { front, back } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!front || !back || typeof front !== 'string' || typeof back !== 'string') {
+        return res.status(400).json({ message: "Front and back content are required" });
+      }
+
+      const flashcardSet = await storage.getFlashcardSet(setId);
+      if (!flashcardSet) {
+        return res.status(404).json({ message: "Flashcard set not found" });
+      }
+
+      if (flashcardSet.studentId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const existingCards = await storage.getFlashcards(setId);
+      const maxOrderIndex = existingCards.length > 0 
+        ? Math.max(...existingCards.map(c => c.orderIndex)) + 1 
+        : 0;
+
+      const newCard = await storage.createFlashcard({
+        setId,
+        front: front.trim(),
+        back: back.trim(),
+        orderIndex: maxOrderIndex,
+        mastered: false,
+      });
+
+      res.json(newCard);
+    } catch (error) {
+      console.error("Error adding flashcard:", error);
+      res.status(500).json({ message: "Failed to add flashcard" });
+    }
+  });
+
+  // Update a flashcard's content
+  app.patch('/api/flashcards/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { front, back } = req.body;
+      const userId = req.user.claims.sub;
+
+      if ((!front && !back) || (front && typeof front !== 'string') || (back && typeof back !== 'string')) {
+        return res.status(400).json({ message: "Valid front or back content is required" });
+      }
+
+      const existingCards = await storage.getFlashcards(id);
+      
+      const updateData: any = {};
+      if (front) updateData.front = front.trim();
+      if (back) updateData.back = back.trim();
+
+      const updatedCard = await storage.updateFlashcard(id, updateData);
+      res.json(updatedCard);
+    } catch (error) {
+      console.error("Error updating flashcard:", error);
+      res.status(500).json({ message: "Failed to update flashcard" });
+    }
+  });
+
+  // Delete a single flashcard
+  app.delete('/api/flashcards/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+
+      await storage.deleteFlashcard(id);
+      res.json({ message: "Flashcard deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting flashcard:", error);
+      res.status(500).json({ message: "Failed to delete flashcard" });
+    }
+  });
+
   // Delete a flashcard set
   app.delete('/api/flashcards/sets/:id', isAuthenticated, async (req: any, res) => {
     try {

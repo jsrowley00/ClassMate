@@ -1236,7 +1236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/courses/:id/practice/generate', isAuthenticated, checkStudentAccess, practiceTestLimiter, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { testMode, questionCount: rawQuestionCount, moduleIds } = req.body;
+      const { testMode, questionCount: rawQuestionCount, moduleIds, textbookChapterIds } = req.body;
       const userId = req.user.claims.sub;
 
       // Validate and coerce questionCount
@@ -1261,9 +1261,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const allMaterials = await storage.getCourseMaterials(id);
-      if (allMaterials.length === 0) {
-        return res.status(400).json({ message: "No study materials available for this course yet. Please wait for your professor to upload materials." });
-      }
 
       // Get all course modules for validation and filtering
       const courseModules = await storage.getCourseModules(id);
@@ -1287,13 +1284,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? allMaterials.filter(m => m.moduleId && expandedModuleIds.includes(m.moduleId))
         : allMaterials;
 
-      if (materials.length === 0) {
-        return res.status(400).json({ message: "No study materials found for the selected modules. Please select different modules or add materials to them." });
+      // Collect content from materials
+      let contentParts: string[] = materials
+        .map(m => m.extractedText || "")
+        .filter(text => text && text.length > 10);
+
+      // Also include textbook chapter content if specified
+      if (textbookChapterIds && Array.isArray(textbookChapterIds) && textbookChapterIds.length > 0) {
+        for (const chapterId of textbookChapterIds) {
+          const chapter = await storage.getTextbookChapter(chapterId);
+          if (chapter && chapter.extractedText) {
+            // Verify chapter belongs to a textbook in this course
+            const textbook = await storage.getTextbook(chapter.textbookId);
+            if (textbook && textbook.courseId === id) {
+              contentParts.push(`[From ${chapter.title}]\n${chapter.extractedText}`);
+            }
+          }
+        }
       }
 
-      const combinedContent = materials
-        .map(m => m.extractedText || "")
-        .filter(text => text && text.length > 10)
+      if (contentParts.length === 0) {
+        return res.status(400).json({ message: "No study materials found for the selected modules/chapters. Please select different content sources." });
+      }
+
+      const combinedContent = contentParts
         .join("\n\n")
         .substring(0, 30000);
 
@@ -2525,6 +2539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { title, cardCount, moduleIds } = validation.data;
+      const { textbookChapterIds } = req.body;
 
       const course = await storage.getCourse(id);
       if (!course) {
@@ -2562,17 +2577,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         materials = materials.filter(m => m.moduleId && expandedModuleIds.includes(m.moduleId));
       }
 
-      if (materials.length === 0) {
+      // Collect content from materials
+      let contentParts: string[] = materials
+        .map(m => m.extractedText || "")
+        .filter(text => text && text.length > 10);
+
+      // Also include textbook chapter content if specified
+      if (textbookChapterIds && Array.isArray(textbookChapterIds) && textbookChapterIds.length > 0) {
+        for (const chapterId of textbookChapterIds) {
+          const chapter = await storage.getTextbookChapter(chapterId);
+          if (chapter && chapter.extractedText) {
+            // Verify chapter belongs to a textbook in this course
+            const textbook = await storage.getTextbook(chapter.textbookId);
+            if (textbook && textbook.courseId === id) {
+              contentParts.push(`[From ${chapter.title}]\n${chapter.extractedText}`);
+            }
+          }
+        }
+      }
+
+      if (contentParts.length === 0) {
         return res.status(400).json({ 
-          message: moduleIds && moduleIds.length > 0 
-            ? "No materials found in selected modules" 
-            : "No study materials available for this course" 
+          message: "No content found in selected modules/chapters" 
         });
       }
 
-      const combinedContent = materials
-        .map(m => m.extractedText || "")
-        .filter(text => text && text.length > 10)
+      const combinedContent = contentParts
         .join("\n\n")
         .substring(0, 30000);
 
@@ -2916,12 +2946,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create the textbook record
       const textbook = await storage.createTextbook({
         courseId: id,
-        uploaderId: userId,
         title: title || fileName || 'Untitled Textbook',
         fileName: fileName,
         totalPages: chapters.reduce((max: number, ch: any) => Math.max(max, ch.endPage || 0), 0),
-        chapterCount: chapters.length,
-        fileData: tempFileData,
         processingStatus: 'processing',
       });
 
@@ -2945,6 +2972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         chapterRecords.push({
           textbookId: textbook.id,
           title: chapter.title,
+          chapterNumber: i + 1,
           orderIndex: i,
           startPage: chapter.startPage,
           endPage: chapter.endPage || chapter.startPage,
@@ -3035,9 +3063,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Textbook not found" });
       }
 
-      // Verify user is the uploader
-      if (textbook.uploaderId !== userId) {
-        return res.status(403).json({ message: "Only the uploader can delete this textbook" });
+      // Verify user is the course owner (professors can delete textbooks)
+      const course = await storage.getCourse(textbook.courseId);
+      if (!course || course.ownerId !== userId) {
+        return res.status(403).json({ message: "Only the course owner can delete this textbook" });
       }
 
       // Delete all chapters first, then the textbook

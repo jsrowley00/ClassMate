@@ -35,12 +35,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ArrowLeft, Upload, FileText, File, Image as ImageIcon, Trash2, Video, UserPlus, X, FolderPlus, Folder, Presentation, BarChart3, TrendingDown, Users, ClipboardList, ChevronDown, Pencil, CalendarIcon, Download } from "lucide-react";
+import { ArrowLeft, Upload, FileText, File, Image as ImageIcon, Trash2, Video, UserPlus, X, FolderPlus, Folder, Presentation, BarChart3, TrendingDown, Users, ClipboardList, ChevronDown, Pencil, CalendarIcon, Download, BookOpen } from "lucide-react";
 import { Link, useParams, useLocation } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Course, CourseMaterial, User, CourseModule } from "@shared/schema";
 import { StudentAnalyticsDialog } from "@/components/StudentAnalyticsDialog";
 import { CanvasImportDialog } from "@/components/CanvasImportDialog";
+import { TextbookUploadDialog } from "@/components/TextbookUploadDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -118,6 +119,7 @@ export default function CourseDetail() {
   const [selectedStudentName, setSelectedStudentName] = useState<string>("");
   const [studentAnalyticsOpen, setStudentAnalyticsOpen] = useState(false);
   const [canvasImportOpen, setCanvasImportOpen] = useState(false);
+  const [textbookUploadOpen, setTextbookUploadOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -1335,7 +1337,7 @@ export default function CourseDetail() {
               </select>
             </div>
           )}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             <div className="border-2 border-dashed rounded-md p-6 text-center">
               <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-4" />
               <div className="space-y-2">
@@ -1355,6 +1357,21 @@ export default function CourseDetail() {
                 </label>
                 <p className="text-xs text-muted-foreground">
                   Supports PDF, Word, PowerPoint, image, and video files
+                </p>
+              </div>
+            </div>
+            
+            <div 
+              className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
+              onClick={() => setTextbookUploadOpen(true)}
+            >
+              <BookOpen className="h-8 w-8 text-muted-foreground mx-auto mb-4" />
+              <div className="space-y-2">
+                <span className="text-sm text-primary hover:underline">
+                  Upload Textbook
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  Auto-detect and split chapters for organized studying
                 </p>
               </div>
             </div>
@@ -1856,6 +1873,15 @@ export default function CourseDetail() {
           onImportComplete={() => {
             queryClient.invalidateQueries({ queryKey: ["/api/courses", id, "materials"] });
           }}
+        />
+      )}
+
+      {/* Textbook Upload Dialog */}
+      {id && (
+        <TextbookUploadDialog
+          courseId={id}
+          open={textbookUploadOpen}
+          onOpenChange={setTextbookUploadOpen}
         />
       )}
     </div>

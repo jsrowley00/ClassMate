@@ -61,6 +61,12 @@ The design emphasizes a clean, educational interface with a professional blue pr
   - Imported files are automatically processed (text extraction for DOCX/PPTX) and added to ClassMate modules
   - Supports PDF, Word docs, PowerPoint, images, and videos
   - Tokens are encrypted at rest using AES-256-GCM encryption
+- **Textbook Upload with Chapter Detection**: Professors can upload PDF textbooks with automatic chapter splitting:
+  - Automatic chapter detection from table of contents or heading patterns
+  - Preview and edit detected chapters before saving
+  - Chapters stored separately from regular modules for organized studying
+  - Chapter content can be used for AI-powered practice tests and flashcards
+  - Database tables: `textbooks` (textbook metadata) and `textbook_chapters` (individual chapters with extracted text)
 
 ### System Design Choices
 - **Frontend**: React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI for components, and Tailwind CSS for styling.

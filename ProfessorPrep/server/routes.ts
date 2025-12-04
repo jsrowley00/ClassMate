@@ -3238,12 +3238,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Import module structure from Canvas to ClassMate
+  // Import module structure and files from Canvas to ClassMate
+  // Supports selective import: only creates selected modules and imports selected files
   app.post('/api/canvas/import-structure', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      const { canvasCourseId, classmateCourseId } = req.body;
+      const { 
+        canvasCourseId, 
+        classmateCourseId, 
+        selectedModuleIds,  // Array of Canvas module IDs to create
+        selectedFileIds,    // Array of Canvas file content IDs to import
+        fileCanvasModuleMapping  // Record<fileId, canvasModuleId> - which Canvas module each file belongs to
+      } = req.body;
 
       if (!user?.canvasAccessToken || !user?.canvasUrl) {
         return res.status(400).json({ message: "Canvas not connected" });
@@ -3253,21 +3260,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Canvas course ID and ClassMate course ID are required" });
       }
 
+      if (!selectedModuleIds || !Array.isArray(selectedModuleIds) || selectedModuleIds.length === 0) {
+        return res.status(400).json({ message: "No modules selected" });
+      }
+
+      if (!selectedFileIds || !Array.isArray(selectedFileIds) || selectedFileIds.length === 0) {
+        return res.status(400).json({ message: "No files selected" });
+      }
+
       const { decryptToken } = await import('./encryption');
-      const { getCanvasModules, getCanvasModuleItems } = await import('./canvas');
+      const { getCanvasModules, downloadCanvasFile } = await import('./canvas');
       const accessToken = decryptToken(user.canvasAccessToken);
       
       // Get Canvas modules
       const canvasModules = await getCanvasModules(user.canvasUrl, accessToken, canvasCourseId);
       
-      // Sort by position
-      canvasModules.sort((a, b) => a.position - b.position);
+      // Sort by position and filter to only selected modules
+      const selectedModuleIdsSet = new Set(selectedModuleIds);
+      const modulesToCreate = canvasModules
+        .filter(m => selectedModuleIdsSet.has(m.id))
+        .sort((a, b) => a.position - b.position);
       
       // Create mapping of Canvas module ID to ClassMate module ID
-      const moduleMapping: Record<number, string> = {};
-      const createdModules = [];
+      const canvasToClassmateModuleMapping: Record<number, string> = {};
+      let modulesCreated = 0;
 
-      for (const canvasModule of canvasModules) {
+      for (const canvasModule of modulesToCreate) {
         // Create a ClassMate module with the same name
         const classmateModule = await storage.createCourseModule({
           courseId: classmateCourseId,
@@ -3276,32 +3294,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
           parentModuleId: null,
         });
         
-        moduleMapping[canvasModule.id] = classmateModule.id;
-        
-        // Get module items to find files
-        const items = await getCanvasModuleItems(user.canvasUrl, accessToken, canvasCourseId, canvasModule.id);
-        const fileItems = items.filter(item => item.type === "File" && item.content_id);
-        
-        createdModules.push({
-          canvasModuleId: canvasModule.id,
-          classmateModuleId: classmateModule.id,
-          name: canvasModule.name,
-          fileCount: fileItems.length,
-          files: fileItems.map(item => ({
-            contentId: item.content_id,
-            title: item.title
-          }))
-        });
+        canvasToClassmateModuleMapping[canvasModule.id] = classmateModule.id;
+        modulesCreated++;
+      }
+
+      // Now import the selected files
+      const importedFiles = [];
+      const errors = [];
+
+      for (const fileId of selectedFileIds) {
+        try {
+          // Download file from Canvas
+          const { buffer, filename, contentType } = await downloadCanvasFile(
+            user.canvasUrl,
+            accessToken,
+            fileId
+          );
+
+          // Convert to base64 data URL
+          const base64 = buffer.toString('base64');
+          const dataUrl = `data:${contentType};base64,${base64}`;
+
+          // Determine file type
+          const ext = filename.split('.').pop()?.toLowerCase();
+          let fileType: string;
+          if (ext === 'pdf') {
+            fileType = 'pdf';
+          } else if (['doc', 'docx'].includes(ext || '')) {
+            fileType = 'document';
+          } else if (['ppt', 'pptx'].includes(ext || '')) {
+            fileType = 'presentation';
+          } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) {
+            fileType = 'image';
+          } else if (['mp4', 'webm', 'mov'].includes(ext || '')) {
+            fileType = 'video';
+          } else {
+            fileType = 'other';
+          }
+
+          // Extract text if possible
+          let extractedText = '';
+          if (ext === 'docx') {
+            try {
+              const mammoth = await import('mammoth');
+              const result = await mammoth.extractRawText({ buffer });
+              extractedText = result.value;
+            } catch (e) {
+              console.error('Error extracting text from docx:', e);
+            }
+          } else if (ext === 'pptx') {
+            try {
+              const officeparser = await import('officeparser');
+              extractedText = await officeparser.parseOfficeAsync(buffer);
+            } catch (e) {
+              console.error('Error extracting text from pptx:', e);
+            }
+          }
+
+          // Determine target module: use the Canvas module mapping to find the ClassMate module
+          const canvasModuleId = fileCanvasModuleMapping?.[fileId];
+          const targetModuleId = canvasModuleId ? canvasToClassmateModuleMapping[canvasModuleId] : null;
+
+          // Create course material
+          const material = await storage.createCourseMaterial({
+            courseId: classmateCourseId,
+            moduleId: targetModuleId,
+            fileName: filename,
+            fileType,
+            fileUrl: dataUrl,
+            extractedText,
+          });
+
+          importedFiles.push({ filename, materialId: material.id, moduleId: targetModuleId });
+        } catch (fileError: any) {
+          console.error(`Error importing file ${fileId}:`, fileError);
+          errors.push({ fileId, error: fileError.message });
+        }
       }
 
       res.json({
         success: true,
-        modules: createdModules,
-        moduleMapping,
+        modulesCreated,
+        filesImported: importedFiles.length,
+        errors: errors.length > 0 ? errors : undefined,
       });
     } catch (error: any) {
       console.error("Error importing Canvas structure:", error);
-      res.status(500).json({ message: error.message || "Failed to import structure" });
+      res.status(500).json({ message: error.message || "Failed to import" });
     }
   });
 

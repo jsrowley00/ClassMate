@@ -70,8 +70,9 @@ export function CanvasImportDialog({
   const [selectedFileIds, setSelectedFileIds] = useState<Set<number>>(new Set());
   const [selectedStudentEmails, setSelectedStudentEmails] = useState<Set<string>>(new Set());
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
-  const [step, setStep] = useState<"status" | "connect" | "courses" | "structure-choice" | "files">("status");
+  const [step, setStep] = useState<"status" | "connect" | "courses" | "structure-choice" | "module-selection" | "files">("status");
   const [activeTab, setActiveTab] = useState<"files" | "students">("files");
+  const [selectedModuleIds, setSelectedModuleIds] = useState<Set<number>>(new Set());
   
   // Structure import state
   const [importedStructure, setImportedStructure] = useState<{
@@ -105,7 +106,7 @@ export function CanvasImportDialog({
     modules: CanvasModule[];
   }>({
     queryKey: ["/api/canvas/courses", selectedCourse?.id, "files"],
-    enabled: isOpen && selectedCourse !== null && step === "files",
+    enabled: isOpen && selectedCourse !== null && (step === "files" || step === "module-selection"),
   });
 
   const { data: studentsData, isLoading: studentsLoading } = useQuery<CanvasStudent[]>({
@@ -156,6 +157,7 @@ export function CanvasImportDialog({
       setSelectedCourse(null);
       setSelectedFileIds(new Set());
       setSelectedStudentEmails(new Set());
+      setSelectedModuleIds(new Set());
       setExpandedModules(new Set());
       setStep("status");
       setActiveTab("files");
@@ -226,6 +228,17 @@ export function CanvasImportDialog({
   const importStructureMutation = useMutation({
     mutationFn: async () => {
       const token = await getToken();
+      
+      // Build file to Canvas module mapping from courseData
+      const fileModuleMapping: Record<number, number> = {};
+      courseData?.modules.forEach(module => {
+        module.items.forEach(item => {
+          if (item.type === "File" && item.content_id && selectedFileIds.has(item.content_id)) {
+            fileModuleMapping[item.content_id] = module.id;
+          }
+        });
+      });
+      
       const response = await fetch("/api/canvas/import-structure", {
         method: "POST",
         headers: {
@@ -235,25 +248,25 @@ export function CanvasImportDialog({
         body: JSON.stringify({
           canvasCourseId: selectedCourse?.id,
           classmateCourseId,
+          selectedModuleIds: Array.from(selectedModuleIds),
+          selectedFileIds: Array.from(selectedFileIds),
+          fileCanvasModuleMapping: fileModuleMapping,
         }),
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to import structure");
+        throw new Error(error.message || "Failed to import");
       }
       return response.json();
     },
     onSuccess: (data) => {
-      setImportedStructure(data);
-      setStructureImported(true);
-      // Expand all modules so user can see files
-      setExpandedModules(new Set(data.modules.map((m: any) => m.canvasModuleId)));
       toast({
-        title: "Module structure imported",
-        description: `Created ${data.modules.length} module(s) in ClassMate. Now select which files to import.`,
+        title: "Import complete",
+        description: `Created ${data.modulesCreated} module(s) and imported ${data.filesImported} file(s).`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/courses", classmateCourseId] });
-      setStep("files");
+      onImportComplete();
+      onClose();
     },
     onError: (error: Error) => {
       toast({
@@ -582,19 +595,15 @@ export function CanvasImportDialog({
           <div className="grid gap-4">
             <button
               className="p-4 border rounded-lg hover:bg-muted/50 text-left transition-colors flex items-start gap-4"
-              onClick={() => importStructureMutation.mutate()}
-              disabled={importStructureMutation.isPending}
+              onClick={() => setStep("module-selection")}
             >
               <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                 <FolderTree className="h-6 w-6 text-primary" />
               </div>
               <div className="flex-1">
-                <div className="font-medium flex items-center gap-2">
-                  Import Module Structure
-                  {importStructureMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                </div>
+                <div className="font-medium">Import with Module Structure</div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Create ClassMate modules that match your Canvas modules. Files will be imported into their corresponding modules.
+                  Select which Canvas modules to recreate in ClassMate, along with their files.
                 </p>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
@@ -615,6 +624,244 @@ export function CanvasImportDialog({
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
             </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (step === "module-selection") {
+      // Helper to get files for a module
+      const getModuleFiles = (module: CanvasModule) => {
+        return module.items.filter(item => item.type === "File" && item.content_id);
+      };
+
+      // Toggle module selection (selects/deselects all files in it too)
+      const toggleModuleSelection = (moduleId: number, files: Array<{ content_id?: number }>) => {
+        const newSelectedModules = new Set(selectedModuleIds);
+        const newSelectedFiles = new Set(selectedFileIds);
+        
+        if (selectedModuleIds.has(moduleId)) {
+          // Deselect module and all its files
+          newSelectedModules.delete(moduleId);
+          files.forEach(f => {
+            if (f.content_id) newSelectedFiles.delete(f.content_id);
+          });
+        } else {
+          // Select module and all its files
+          newSelectedModules.add(moduleId);
+          files.forEach(f => {
+            if (f.content_id) newSelectedFiles.add(f.content_id);
+          });
+        }
+        
+        setSelectedModuleIds(newSelectedModules);
+        setSelectedFileIds(newSelectedFiles);
+      };
+
+      // Toggle individual file (updates module partial state)
+      const toggleFileInModule = (fileId: number, moduleId: number, allModuleFiles: Array<{ content_id?: number }>) => {
+        const newSelectedFiles = new Set(selectedFileIds);
+        const newSelectedModules = new Set(selectedModuleIds);
+        
+        if (selectedFileIds.has(fileId)) {
+          newSelectedFiles.delete(fileId);
+        } else {
+          newSelectedFiles.add(fileId);
+        }
+        
+        // Check if any files in this module are selected
+        const anyFileSelected = allModuleFiles.some(f => f.content_id && newSelectedFiles.has(f.content_id));
+        if (anyFileSelected) {
+          newSelectedModules.add(moduleId);
+        } else {
+          newSelectedModules.delete(moduleId);
+        }
+        
+        setSelectedFileIds(newSelectedFiles);
+        setSelectedModuleIds(newSelectedModules);
+      };
+
+      // Check if all files in a module are selected
+      const areAllFilesSelected = (files: Array<{ content_id?: number }>) => {
+        const fileIds = files.filter(f => f.content_id).map(f => f.content_id!);
+        return fileIds.length > 0 && fileIds.every(id => selectedFileIds.has(id));
+      };
+
+      // Check if some (but not all) files are selected
+      const areSomeFilesSelected = (files: Array<{ content_id?: number }>) => {
+        const fileIds = files.filter(f => f.content_id).map(f => f.content_id!);
+        const selectedCount = fileIds.filter(id => selectedFileIds.has(id)).length;
+        return selectedCount > 0 && selectedCount < fileIds.length;
+      };
+
+      // Select all modules and files
+      const selectAll = () => {
+        const newModules = new Set<number>();
+        const newFiles = new Set<number>();
+        courseData?.modules.forEach(module => {
+          const files = getModuleFiles(module);
+          if (files.length > 0) {
+            newModules.add(module.id);
+            files.forEach(f => {
+              if (f.content_id) newFiles.add(f.content_id);
+            });
+          }
+        });
+        setSelectedModuleIds(newModules);
+        setSelectedFileIds(newFiles);
+      };
+
+      // Deselect all
+      const deselectAll = () => {
+        setSelectedModuleIds(new Set());
+        setSelectedFileIds(new Set());
+      };
+
+      // Count totals
+      const totalModulesWithFiles = courseData?.modules.filter(m => getModuleFiles(m).length > 0).length || 0;
+      const totalFiles = courseData?.modules.reduce((sum, m) => sum + getModuleFiles(m).length, 0) || 0;
+
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedModuleIds(new Set());
+                setSelectedFileIds(new Set());
+                setStep("structure-choice");
+              }}
+            >
+              Back
+            </Button>
+            <span className="text-muted-foreground">/</span>
+            <span className="font-medium">{selectedCourse?.name}</span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium">Select Modules & Files</h4>
+              <p className="text-sm text-muted-foreground">
+                {selectedModuleIds.size} of {totalModulesWithFiles} modules, {selectedFileIds.size} of {totalFiles} files selected
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={selectAll}>
+                Select All
+              </Button>
+              <Button variant="outline" size="sm" onClick={deselectAll}>
+                Clear
+              </Button>
+            </div>
+          </div>
+
+          {filesLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : courseData?.modules && courseData.modules.length > 0 ? (
+            <ScrollArea className="h-[350px] border rounded-md p-2">
+              <div className="space-y-1">
+                {courseData.modules.map((module) => {
+                  const files = getModuleFiles(module);
+                  if (files.length === 0) return null;
+                  
+                  const isExpanded = expandedModules.has(module.id);
+                  const allSelected = areAllFilesSelected(files);
+                  const someSelected = areSomeFilesSelected(files);
+                  
+                  return (
+                    <div key={module.id} className="border rounded-md">
+                      <div className="flex items-center gap-2 p-3 hover:bg-muted/50">
+                        <Checkbox
+                          checked={allSelected}
+                          ref={(el) => {
+                            if (el) {
+                              (el as unknown as HTMLInputElement).indeterminate = someSelected && !allSelected;
+                            }
+                          }}
+                          onCheckedChange={() => toggleModuleSelection(module.id, files)}
+                        />
+                        <button
+                          className="flex items-center gap-2 flex-1 text-left"
+                          onClick={() => toggleModuleExpansion(module.id)}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                          <Folder className="h-4 w-4 text-blue-500" />
+                          <span className="font-medium">{module.name}</span>
+                          <Badge variant="secondary" className="ml-auto">
+                            {files.filter(f => f.content_id && selectedFileIds.has(f.content_id)).length}/{files.length}
+                          </Badge>
+                        </button>
+                      </div>
+                      
+                      {isExpanded && (
+                        <div className="border-t bg-muted/20 p-2 space-y-1">
+                          {files.map((item) => {
+                            if (!item.content_id) return null;
+                            const isSelected = selectedFileIds.has(item.content_id);
+                            
+                            return (
+                              <label
+                                key={item.id}
+                                className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleFileInModule(item.content_id!, module.id, files)}
+                                />
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm">{item.title}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No modules with files found in this course.</p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedModuleIds(new Set());
+                setSelectedFileIds(new Set());
+                setStep("structure-choice");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => importStructureMutation.mutate()}
+              disabled={selectedFileIds.size === 0 || importStructureMutation.isPending}
+            >
+              {importStructureMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Import Selected ({selectedFileIds.size} files)
+                </>
+              )}
+            </Button>
           </div>
         </div>
       );

@@ -68,6 +68,11 @@ The design emphasizes a clean, educational interface with a professional blue pr
 - **Database**: PostgreSQL with Drizzle ORM.
 - **Authentication**: Clerk for authentication (email/password and Google sign-in).
 - **AI Integration**: OpenAI API for all AI-powered features (test generation, tutoring, objective generation, categorization).
+- **File Storage**: Replit Object Storage (@replit/object-storage SDK) for course materials. Files are stored externally to prevent database memory issues. Key architecture:
+  - New uploads use object storage with storageKey, contentType, sizeBytes columns in courseMaterials table
+  - Legacy materials with base64 fileUrl are still supported for backward compatibility
+  - extractedText remains in PostgreSQL for AI features
+  - Canvas imports use object storage to prevent heap overflow with large files
 
 ## External Dependencies
 - **Clerk**: For user authentication with email/password and Google sign-in options. Configure sign-in methods in the Clerk dashboard.

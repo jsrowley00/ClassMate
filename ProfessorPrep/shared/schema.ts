@@ -79,7 +79,10 @@ export const courseMaterials = pgTable("course_materials", {
   moduleId: varchar("module_id").references(() => courseModules.id, { onDelete: 'cascade' }),
   fileName: text("file_name").notNull(),
   fileType: varchar("file_type").notNull(), // "pdf", "docx", "image"
-  fileUrl: text("file_url").notNull(),
+  fileUrl: text("file_url"), // Legacy: base64 data URL (null for new object storage materials)
+  storageKey: text("storage_key"), // Object storage key (null for legacy base64 materials)
+  contentType: varchar("content_type"), // MIME type
+  sizeBytes: integer("size_bytes"), // File size in bytes
   extractedText: text("extracted_text"), // Text content extracted from the file
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });

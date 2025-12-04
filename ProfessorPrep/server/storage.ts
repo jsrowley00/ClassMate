@@ -14,6 +14,8 @@ import {
   objectiveMastery,
   practiceAttempts,
   shortAnswerEvaluations,
+  textbooks,
+  textbookChapters,
   type User,
   type UpsertUser,
   type Course,
@@ -45,6 +47,10 @@ import {
   type InsertPracticeAttempt,
   type ShortAnswerEvaluation,
   type InsertShortAnswerEvaluation,
+  type Textbook,
+  type InsertTextbook,
+  type TextbookChapter,
+  type InsertTextbookChapter,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -146,6 +152,19 @@ export interface IStorage {
   createPracticeAttempt(attempt: InsertPracticeAttempt): Promise<PracticeAttempt>;
   createShortAnswerEvaluation(evaluation: InsertShortAnswerEvaluation): Promise<ShortAnswerEvaluation>;
   getPracticeAttemptsForObjective(studentId: string, moduleId: string, objectiveIndex: number): Promise<Array<PracticeAttempt & { evaluation?: ShortAnswerEvaluation }>>;
+
+  // Textbook operations
+  getTextbooks(courseId: string): Promise<Textbook[]>;
+  getTextbook(id: string): Promise<Textbook | undefined>;
+  createTextbook(textbook: InsertTextbook): Promise<Textbook>;
+  updateTextbook(id: string, data: Partial<Textbook>): Promise<Textbook>;
+  deleteTextbook(id: string): Promise<void>;
+  getTextbookChapters(textbookId: string): Promise<TextbookChapter[]>;
+  getTextbookChapter(id: string): Promise<TextbookChapter | undefined>;
+  createTextbookChapter(chapter: InsertTextbookChapter): Promise<TextbookChapter>;
+  createTextbookChapters(chapters: InsertTextbookChapter[]): Promise<TextbookChapter[]>;
+  updateTextbookChapter(id: string, data: Partial<TextbookChapter>): Promise<TextbookChapter>;
+  deleteTextbookChapter(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -959,6 +978,75 @@ export class DatabaseStorage implements IStorage {
     );
 
     return attemptsWithEvaluations;
+  }
+
+  // Textbook operations
+  async getTextbooks(courseId: string): Promise<Textbook[]> {
+    return await db
+      .select()
+      .from(textbooks)
+      .where(eq(textbooks.courseId, courseId))
+      .orderBy(desc(textbooks.uploadedAt));
+  }
+
+  async getTextbook(id: string): Promise<Textbook | undefined> {
+    const [textbook] = await db.select().from(textbooks).where(eq(textbooks.id, id));
+    return textbook;
+  }
+
+  async createTextbook(textbookData: InsertTextbook): Promise<Textbook> {
+    const [textbook] = await db.insert(textbooks).values(textbookData).returning();
+    return textbook;
+  }
+
+  async updateTextbook(id: string, data: Partial<Textbook>): Promise<Textbook> {
+    const [textbook] = await db
+      .update(textbooks)
+      .set(data)
+      .where(eq(textbooks.id, id))
+      .returning();
+    return textbook;
+  }
+
+  async deleteTextbook(id: string): Promise<void> {
+    await db.delete(textbooks).where(eq(textbooks.id, id));
+  }
+
+  async getTextbookChapters(textbookId: string): Promise<TextbookChapter[]> {
+    return await db
+      .select()
+      .from(textbookChapters)
+      .where(eq(textbookChapters.textbookId, textbookId))
+      .orderBy(textbookChapters.orderIndex);
+  }
+
+  async getTextbookChapter(id: string): Promise<TextbookChapter | undefined> {
+    const [chapter] = await db.select().from(textbookChapters).where(eq(textbookChapters.id, id));
+    return chapter;
+  }
+
+  async createTextbookChapter(chapterData: InsertTextbookChapter): Promise<TextbookChapter> {
+    const [chapter] = await db.insert(textbookChapters).values(chapterData).returning();
+    return chapter;
+  }
+
+  async createTextbookChapters(chaptersData: InsertTextbookChapter[]): Promise<TextbookChapter[]> {
+    if (chaptersData.length === 0) return [];
+    const chapters = await db.insert(textbookChapters).values(chaptersData).returning();
+    return chapters;
+  }
+
+  async updateTextbookChapter(id: string, data: Partial<TextbookChapter>): Promise<TextbookChapter> {
+    const [chapter] = await db
+      .update(textbookChapters)
+      .set(data)
+      .where(eq(textbookChapters.id, id))
+      .returning();
+    return chapter;
+  }
+
+  async deleteTextbookChapter(id: string): Promise<void> {
+    await db.delete(textbookChapters).where(eq(textbookChapters.id, id));
   }
 }
 

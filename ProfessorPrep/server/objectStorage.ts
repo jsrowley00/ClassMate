@@ -2,7 +2,32 @@ import { Client } from "@replit/object-storage";
 import { randomUUID } from "crypto";
 import { Response } from "express";
 
-const client = new Client();
+let client: Client | null = null;
+let isAvailable: boolean | null = null;
+
+async function getClient(): Promise<Client | null> {
+  if (client !== null) return client;
+  
+  try {
+    const newClient = new Client();
+    // Test if the client is properly configured by trying to list objects
+    const result = await newClient.list({ prefix: "__test__" });
+    if (result.ok) {
+      client = newClient;
+      isAvailable = true;
+      console.log("Object Storage is available and configured");
+      return client;
+    } else {
+      console.log("Object Storage is not configured:", result.error);
+      isAvailable = false;
+      return null;
+    }
+  } catch (error) {
+    console.log("Object Storage initialization failed:", error);
+    isAvailable = false;
+    return null;
+  }
+}
 
 export class ObjectNotFoundError extends Error {
   constructor() {
@@ -13,6 +38,12 @@ export class ObjectNotFoundError extends Error {
 }
 
 export class ObjectStorageService {
+  async isAvailable(): Promise<boolean> {
+    if (isAvailable !== null) return isAvailable;
+    const c = await getClient();
+    return c !== null;
+  }
+
   generateStorageKey(courseId: string, filename: string): string {
     const uuid = randomUUID();
     const safeFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -24,7 +55,12 @@ export class ObjectStorageService {
     storageKey: string,
     _contentType: string
   ): Promise<{ storageKey: string; sizeBytes: number }> {
-    const result = await client.uploadFromBytes(storageKey, buffer);
+    const c = await getClient();
+    if (!c) {
+      throw new Error("Object Storage is not available. Please create a bucket in App Storage.");
+    }
+    
+    const result = await c.uploadFromBytes(storageKey, buffer);
     
     if (!result.ok) {
       throw new Error(`Failed to upload: ${result.error}`);
@@ -37,7 +73,12 @@ export class ObjectStorageService {
   }
 
   async downloadToBuffer(storageKey: string): Promise<Buffer> {
-    const result = await client.downloadAsBytes(storageKey);
+    const c = await getClient();
+    if (!c) {
+      throw new Error("Object Storage is not available");
+    }
+    
+    const result = await c.downloadAsBytes(storageKey);
     
     if (!result.ok) {
       throw new ObjectNotFoundError();
@@ -47,7 +88,12 @@ export class ObjectStorageService {
   }
 
   async streamToResponse(storageKey: string, res: Response, contentType?: string): Promise<void> {
-    const stream = client.downloadAsStream(storageKey);
+    const c = await getClient();
+    if (!c) {
+      throw new Error("Object Storage is not available");
+    }
+    
+    const stream = c.downloadAsStream(storageKey);
     
     if (contentType) {
       res.set("Content-Type", contentType);
@@ -65,14 +111,20 @@ export class ObjectStorageService {
   }
 
   async deleteObject(storageKey: string): Promise<void> {
-    const result = await client.delete(storageKey, { ignoreNotFound: true });
+    const c = await getClient();
+    if (!c) return;
+    
+    const result = await c.delete(storageKey, { ignoreNotFound: true });
     if (!result.ok) {
       console.error(`Failed to delete object ${storageKey}:`, result.error);
     }
   }
 
   async objectExists(storageKey: string): Promise<boolean> {
-    const result = await client.exists(storageKey);
+    const c = await getClient();
+    if (!c) return false;
+    
+    const result = await c.exists(storageKey);
     if (!result.ok) {
       return false;
     }
@@ -80,7 +132,12 @@ export class ObjectStorageService {
   }
 
   async listObjects(prefix?: string): Promise<string[]> {
-    const result = await client.list(prefix ? { prefix } : undefined);
+    const c = await getClient();
+    if (!c) {
+      throw new Error("Object Storage is not available");
+    }
+    
+    const result = await c.list(prefix ? { prefix } : undefined);
     if (!result.ok) {
       throw new Error(`Failed to list objects: ${result.error}`);
     }

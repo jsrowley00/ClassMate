@@ -3393,23 +3393,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
 
-            // Convert to base64 data URL
-            const base64 = buffer.toString('base64');
-            const dataUrl = `data:${contentType};base64,${base64}`;
-
             // Determine target module: use the Canvas module mapping to find the ClassMate module
             const canvasModuleId = fileCanvasModuleMapping?.[fileId];
             const targetModuleId = canvasModuleId ? canvasToClassmateModuleMapping[canvasModuleId] : null;
 
-            // Create course material
-            const material = await storage.createCourseMaterial({
+            // Try to use object storage, fall back to base64 if not available
+            const { objectStorageService } = await import('./objectStorage');
+            let materialData: any = {
               courseId: classmateCourseId,
               moduleId: targetModuleId,
               fileName: filename,
               fileType,
-              fileUrl: dataUrl,
               extractedText,
-            });
+            };
+
+            if (await objectStorageService.isAvailable()) {
+              const storageKey = objectStorageService.generateStorageKey(classmateCourseId, filename);
+              const { sizeBytes } = await objectStorageService.uploadBuffer(buffer, storageKey, contentType);
+              materialData.fileUrl = null;
+              materialData.storageKey = storageKey;
+              materialData.contentType = contentType;
+              materialData.sizeBytes = sizeBytes;
+            } else {
+              // Fall back to base64
+              const base64 = buffer.toString('base64');
+              materialData.fileUrl = `data:${contentType};base64,${base64}`;
+            }
+
+            // Create course material
+            const material = await storage.createCourseMaterial(materialData);
 
             importedFiles.push({ filename, materialId: material.id, moduleId: targetModuleId });
           } catch (fileError: any) {
@@ -3497,22 +3509,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Store file as base64 data URL
-          const base64Data = buffer.toString('base64');
-          const dataUrl = `data:${contentType};base64,${base64Data}`;
-
           // Determine target module: use mapping if provided, otherwise use single module
           const targetModuleId = fileModuleMapping?.[fileId.toString()] || classmateModuleId || null;
 
-          // Create course material
-          const material = await storage.createCourseMaterial({
+          // Try to use object storage, fall back to base64 if not available
+          const { objectStorageService } = await import('./objectStorage');
+          let materialData: any = {
             courseId: classmateCourseId,
             moduleId: targetModuleId,
             fileName: filename,
             fileType,
-            fileUrl: dataUrl,
             extractedText,
-          });
+          };
+
+          if (await objectStorageService.isAvailable()) {
+            const storageKey = objectStorageService.generateStorageKey(classmateCourseId, filename);
+            const { sizeBytes } = await objectStorageService.uploadBuffer(buffer, storageKey, contentType);
+            materialData.fileUrl = null;
+            materialData.storageKey = storageKey;
+            materialData.contentType = contentType;
+            materialData.sizeBytes = sizeBytes;
+          } else {
+            // Fall back to base64
+            const base64Data = buffer.toString('base64');
+            materialData.fileUrl = `data:${contentType};base64,${base64Data}`;
+          }
+
+          // Create course material
+          const material = await storage.createCourseMaterial(materialData);
 
           importedFiles.push({ filename, materialId: material.id, moduleId: targetModuleId });
 

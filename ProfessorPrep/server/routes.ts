@@ -3260,121 +3260,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Canvas course ID and ClassMate course ID are required" });
       }
 
-      if (!selectedModuleIds || !Array.isArray(selectedModuleIds) || selectedModuleIds.length === 0) {
-        return res.status(400).json({ message: "No modules selected" });
-      }
-
-      if (!selectedFileIds || !Array.isArray(selectedFileIds) || selectedFileIds.length === 0) {
-        return res.status(400).json({ message: "No files selected" });
+      // At least modules or files must be selected
+      const hasModules = selectedModuleIds && Array.isArray(selectedModuleIds) && selectedModuleIds.length > 0;
+      const hasFiles = selectedFileIds && Array.isArray(selectedFileIds) && selectedFileIds.length > 0;
+      
+      if (!hasModules && !hasFiles) {
+        return res.status(400).json({ message: "No modules or files selected" });
       }
 
       const { decryptToken } = await import('./encryption');
       const { getCanvasModules, downloadCanvasFile } = await import('./canvas');
       const accessToken = decryptToken(user.canvasAccessToken);
       
+      // Get existing ClassMate modules to prevent duplicates
+      const existingModules = await storage.getCourseModules(classmateCourseId);
+      const existingModuleNames = new Set(existingModules.map(m => m.name.toLowerCase().trim()));
+      
       // Get Canvas modules
       const canvasModules = await getCanvasModules(user.canvasUrl, accessToken, canvasCourseId);
       
       // Sort by position and filter to only selected modules
-      const selectedModuleIdsSet = new Set(selectedModuleIds);
-      const modulesToCreate = canvasModules
-        .filter(m => selectedModuleIdsSet.has(m.id))
-        .sort((a, b) => a.position - b.position);
+      const selectedModuleIdsSet = new Set(selectedModuleIds || []);
+      const modulesToProcess = hasModules 
+        ? canvasModules.filter(m => selectedModuleIdsSet.has(m.id)).sort((a, b) => a.position - b.position)
+        : [];
       
       // Create mapping of Canvas module ID to ClassMate module ID
       const canvasToClassmateModuleMapping: Record<number, string> = {};
       let modulesCreated = 0;
+      let modulesSkipped = 0;
 
-      for (const canvasModule of modulesToCreate) {
-        // Create a ClassMate module with the same name
-        const classmateModule = await storage.createCourseModule({
-          courseId: classmateCourseId,
-          name: canvasModule.name,
-          description: null,
-          parentModuleId: null,
-        });
+      // Track modules created in this request to prevent duplicates within the same import
+      const modulesCreatedInThisRequest: Record<string, string> = {}; // normalizedName -> classmateModuleId
+      
+      for (const canvasModule of modulesToProcess) {
+        const normalizedName = canvasModule.name.toLowerCase().trim();
         
-        canvasToClassmateModuleMapping[canvasModule.id] = classmateModule.id;
-        modulesCreated++;
+        // Check if a module with this name already exists (either pre-existing or created earlier in this request)
+        if (existingModuleNames.has(normalizedName)) {
+          // Find the existing module to get its ID
+          const existingModule = existingModules.find(m => m.name.toLowerCase().trim() === normalizedName);
+          const existingId = existingModule?.id || modulesCreatedInThisRequest[normalizedName];
+          
+          if (existingId) {
+            canvasToClassmateModuleMapping[canvasModule.id] = existingId;
+            modulesSkipped++;
+          }
+        } else {
+          // Create a ClassMate module with the same name
+          const classmateModule = await storage.createCourseModule({
+            courseId: classmateCourseId,
+            name: canvasModule.name,
+            description: null,
+            parentModuleId: null,
+          });
+          
+          canvasToClassmateModuleMapping[canvasModule.id] = classmateModule.id;
+          existingModuleNames.add(normalizedName);
+          modulesCreatedInThisRequest[normalizedName] = classmateModule.id;
+          modulesCreated++;
+        }
       }
 
-      // Now import the selected files
-      const importedFiles = [];
-      const errors = [];
+      // Now import the selected files (if any)
+      const importedFiles: Array<{ filename: string; materialId: string; moduleId: string | null }> = [];
+      const errors: Array<{ fileId: number; error: string }> = [];
 
-      for (const fileId of selectedFileIds) {
-        try {
-          // Download file from Canvas
-          const { buffer, filename, contentType } = await downloadCanvasFile(
-            user.canvasUrl,
-            accessToken,
-            fileId
-          );
+      if (hasFiles) {
+        for (const fileId of selectedFileIds) {
+          try {
+            // Download file from Canvas
+            const { buffer, filename, contentType } = await downloadCanvasFile(
+              user.canvasUrl,
+              accessToken,
+              fileId
+            );
 
-          // Convert to base64 data URL
-          const base64 = buffer.toString('base64');
-          const dataUrl = `data:${contentType};base64,${base64}`;
+            // Convert to base64 data URL
+            const base64 = buffer.toString('base64');
+            const dataUrl = `data:${contentType};base64,${base64}`;
 
-          // Determine file type
-          const ext = filename.split('.').pop()?.toLowerCase();
-          let fileType: string;
-          if (ext === 'pdf') {
-            fileType = 'pdf';
-          } else if (['doc', 'docx'].includes(ext || '')) {
-            fileType = 'document';
-          } else if (['ppt', 'pptx'].includes(ext || '')) {
-            fileType = 'presentation';
-          } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) {
-            fileType = 'image';
-          } else if (['mp4', 'webm', 'mov'].includes(ext || '')) {
-            fileType = 'video';
-          } else {
-            fileType = 'other';
-          }
-
-          // Extract text if possible
-          let extractedText = '';
-          if (ext === 'docx') {
-            try {
-              const mammoth = await import('mammoth');
-              const result = await mammoth.extractRawText({ buffer });
-              extractedText = result.value;
-            } catch (e) {
-              console.error('Error extracting text from docx:', e);
+            // Determine file type
+            const ext = filename.split('.').pop()?.toLowerCase();
+            let fileType: string;
+            if (ext === 'pdf') {
+              fileType = 'pdf';
+            } else if (['doc', 'docx'].includes(ext || '')) {
+              fileType = 'document';
+            } else if (['ppt', 'pptx'].includes(ext || '')) {
+              fileType = 'presentation';
+            } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) {
+              fileType = 'image';
+            } else if (['mp4', 'webm', 'mov'].includes(ext || '')) {
+              fileType = 'video';
+            } else {
+              fileType = 'other';
             }
-          } else if (ext === 'pptx') {
-            try {
-              const officeparser = await import('officeparser');
-              extractedText = await officeparser.parseOfficeAsync(buffer);
-            } catch (e) {
-              console.error('Error extracting text from pptx:', e);
+
+            // Extract text if possible
+            let extractedText = '';
+            if (ext === 'docx') {
+              try {
+                const mammoth = await import('mammoth');
+                const result = await mammoth.extractRawText({ buffer });
+                extractedText = result.value;
+              } catch (e) {
+                console.error('Error extracting text from docx:', e);
+              }
+            } else if (ext === 'pptx') {
+              try {
+                const officeparser = await import('officeparser');
+                extractedText = await officeparser.parseOfficeAsync(buffer);
+              } catch (e) {
+                console.error('Error extracting text from pptx:', e);
+              }
             }
+
+            // Determine target module: use the Canvas module mapping to find the ClassMate module
+            const canvasModuleId = fileCanvasModuleMapping?.[fileId];
+            const targetModuleId = canvasModuleId ? canvasToClassmateModuleMapping[canvasModuleId] : null;
+
+            // Create course material
+            const material = await storage.createCourseMaterial({
+              courseId: classmateCourseId,
+              moduleId: targetModuleId,
+              fileName: filename,
+              fileType,
+              fileUrl: dataUrl,
+              extractedText,
+            });
+
+            importedFiles.push({ filename, materialId: material.id, moduleId: targetModuleId });
+          } catch (fileError: any) {
+            console.error(`Error importing file ${fileId}:`, fileError);
+            errors.push({ fileId, error: fileError.message });
           }
-
-          // Determine target module: use the Canvas module mapping to find the ClassMate module
-          const canvasModuleId = fileCanvasModuleMapping?.[fileId];
-          const targetModuleId = canvasModuleId ? canvasToClassmateModuleMapping[canvasModuleId] : null;
-
-          // Create course material
-          const material = await storage.createCourseMaterial({
-            courseId: classmateCourseId,
-            moduleId: targetModuleId,
-            fileName: filename,
-            fileType,
-            fileUrl: dataUrl,
-            extractedText,
-          });
-
-          importedFiles.push({ filename, materialId: material.id, moduleId: targetModuleId });
-        } catch (fileError: any) {
-          console.error(`Error importing file ${fileId}:`, fileError);
-          errors.push({ fileId, error: fileError.message });
         }
       }
 
       res.json({
         success: true,
         modulesCreated,
+        modulesSkipped,
         filesImported: importedFiles.length,
         errors: errors.length > 0 ? errors : undefined,
       });

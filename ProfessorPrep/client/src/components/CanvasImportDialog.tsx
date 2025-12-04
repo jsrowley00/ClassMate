@@ -260,9 +260,14 @@ export function CanvasImportDialog({
       return response.json();
     },
     onSuccess: (data) => {
+      const parts = [];
+      if (data.modulesCreated > 0) parts.push(`Created ${data.modulesCreated} module(s)`);
+      if (data.modulesSkipped > 0) parts.push(`${data.modulesSkipped} module(s) already existed`);
+      if (data.filesImported > 0) parts.push(`imported ${data.filesImported} file(s)`);
+      
       toast({
         title: "Import complete",
-        description: `Created ${data.modulesCreated} module(s) and imported ${data.filesImported} file(s).`,
+        description: parts.length > 0 ? parts.join(', ') + '.' : 'No changes made.',
       });
       queryClient.invalidateQueries({ queryKey: ["/api/courses", classmateCourseId] });
       onImportComplete();
@@ -635,33 +640,22 @@ export function CanvasImportDialog({
         return module.items.filter(item => item.type === "File" && item.content_id);
       };
 
-      // Toggle module selection (selects/deselects all files in it too)
-      const toggleModuleSelection = (moduleId: number, files: Array<{ content_id?: number }>) => {
+      // Toggle module selection (only toggles the module, not files)
+      const toggleModuleSelection = (moduleId: number) => {
         const newSelectedModules = new Set(selectedModuleIds);
-        const newSelectedFiles = new Set(selectedFileIds);
         
         if (selectedModuleIds.has(moduleId)) {
-          // Deselect module and all its files
           newSelectedModules.delete(moduleId);
-          files.forEach(f => {
-            if (f.content_id) newSelectedFiles.delete(f.content_id);
-          });
         } else {
-          // Select module and all its files
           newSelectedModules.add(moduleId);
-          files.forEach(f => {
-            if (f.content_id) newSelectedFiles.add(f.content_id);
-          });
         }
         
         setSelectedModuleIds(newSelectedModules);
-        setSelectedFileIds(newSelectedFiles);
       };
 
-      // Toggle individual file (updates module partial state)
-      const toggleFileInModule = (fileId: number, moduleId: number, allModuleFiles: Array<{ content_id?: number }>) => {
+      // Toggle individual file (no auto-module selection)
+      const toggleFileInModule = (fileId: number) => {
         const newSelectedFiles = new Set(selectedFileIds);
-        const newSelectedModules = new Set(selectedModuleIds);
         
         if (selectedFileIds.has(fileId)) {
           newSelectedFiles.delete(fileId);
@@ -669,29 +663,12 @@ export function CanvasImportDialog({
           newSelectedFiles.add(fileId);
         }
         
-        // Check if any files in this module are selected
-        const anyFileSelected = allModuleFiles.some(f => f.content_id && newSelectedFiles.has(f.content_id));
-        if (anyFileSelected) {
-          newSelectedModules.add(moduleId);
-        } else {
-          newSelectedModules.delete(moduleId);
-        }
-        
         setSelectedFileIds(newSelectedFiles);
-        setSelectedModuleIds(newSelectedModules);
       };
 
-      // Check if all files in a module are selected
-      const areAllFilesSelected = (files: Array<{ content_id?: number }>) => {
-        const fileIds = files.filter(f => f.content_id).map(f => f.content_id!);
-        return fileIds.length > 0 && fileIds.every(id => selectedFileIds.has(id));
-      };
-
-      // Check if some (but not all) files are selected
-      const areSomeFilesSelected = (files: Array<{ content_id?: number }>) => {
-        const fileIds = files.filter(f => f.content_id).map(f => f.content_id!);
-        const selectedCount = fileIds.filter(id => selectedFileIds.has(id)).length;
-        return selectedCount > 0 && selectedCount < fileIds.length;
+      // Count selected files in a module
+      const countSelectedFilesInModule = (files: Array<{ content_id?: number }>) => {
+        return files.filter(f => f.content_id && selectedFileIds.has(f.content_id)).length;
       };
 
       // Select all modules and files
@@ -770,20 +747,15 @@ export function CanvasImportDialog({
                   if (files.length === 0) return null;
                   
                   const isExpanded = expandedModules.has(module.id);
-                  const allSelected = areAllFilesSelected(files);
-                  const someSelected = areSomeFilesSelected(files);
+                  const isModuleSelected = selectedModuleIds.has(module.id);
+                  const selectedFilesCount = countSelectedFilesInModule(files);
                   
                   return (
                     <div key={module.id} className="border rounded-md">
                       <div className="flex items-center gap-2 p-3 hover:bg-muted/50">
                         <Checkbox
-                          checked={allSelected}
-                          ref={(el) => {
-                            if (el) {
-                              (el as unknown as HTMLInputElement).indeterminate = someSelected && !allSelected;
-                            }
-                          }}
-                          onCheckedChange={() => toggleModuleSelection(module.id, files)}
+                          checked={isModuleSelected}
+                          onCheckedChange={() => toggleModuleSelection(module.id)}
                         />
                         <button
                           className="flex items-center gap-2 flex-1 text-left"
@@ -797,7 +769,7 @@ export function CanvasImportDialog({
                           <Folder className="h-4 w-4 text-blue-500" />
                           <span className="font-medium">{module.name}</span>
                           <Badge variant="secondary" className="ml-auto">
-                            {files.filter(f => f.content_id && selectedFileIds.has(f.content_id)).length}/{files.length}
+                            {selectedFilesCount}/{files.length}
                           </Badge>
                         </button>
                       </div>
@@ -815,7 +787,7 @@ export function CanvasImportDialog({
                               >
                                 <Checkbox
                                   checked={isSelected}
-                                  onCheckedChange={() => toggleFileInModule(item.content_id!, module.id, files)}
+                                  onCheckedChange={() => toggleFileInModule(item.content_id!)}
                                 />
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm">{item.title}</span>
@@ -848,7 +820,7 @@ export function CanvasImportDialog({
             </Button>
             <Button
               onClick={() => importStructureMutation.mutate()}
-              disabled={selectedFileIds.size === 0 || importStructureMutation.isPending}
+              disabled={(selectedModuleIds.size === 0 && selectedFileIds.size === 0) || importStructureMutation.isPending}
             >
               {importStructureMutation.isPending ? (
                 <>
@@ -858,7 +830,10 @@ export function CanvasImportDialog({
               ) : (
                 <>
                   <Download className="mr-2 h-4 w-4" />
-                  Import Selected ({selectedFileIds.size} files)
+                  Import Selected
+                  {selectedModuleIds.size > 0 && ` (${selectedModuleIds.size} modules`}
+                  {selectedFileIds.size > 0 && `${selectedModuleIds.size > 0 ? ', ' : ' ('}${selectedFileIds.size} files`}
+                  {(selectedModuleIds.size > 0 || selectedFileIds.size > 0) && ')'}
                 </>
               )}
             </Button>

@@ -3374,7 +3374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fileType = 'other';
             }
 
-            // Extract text if possible (before uploading to storage)
+            // Extract text if possible
             let extractedText = '';
             if (ext === 'docx') {
               try {
@@ -3393,25 +3393,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
 
-            // Upload to object storage instead of storing as base64
-            const { objectStorageService } = await import('./objectStorage');
-            const storageKey = objectStorageService.generateStorageKey(classmateCourseId, filename);
-            const { sizeBytes } = await objectStorageService.uploadBuffer(buffer, storageKey, contentType);
+            // Convert to base64 data URL
+            const base64 = buffer.toString('base64');
+            const dataUrl = `data:${contentType};base64,${base64}`;
 
             // Determine target module: use the Canvas module mapping to find the ClassMate module
             const canvasModuleId = fileCanvasModuleMapping?.[fileId];
             const targetModuleId = canvasModuleId ? canvasToClassmateModuleMapping[canvasModuleId] : null;
 
-            // Create course material with object storage reference
+            // Create course material
             const material = await storage.createCourseMaterial({
               courseId: classmateCourseId,
               moduleId: targetModuleId,
               fileName: filename,
               fileType,
-              fileUrl: null, // No base64 data - using object storage
-              storageKey,
-              contentType,
-              sizeBytes,
+              fileUrl: dataUrl,
               extractedText,
             });
 
@@ -3481,7 +3477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           else if (contentType.includes('image')) fileType = 'image';
           else if (contentType.includes('video')) fileType = 'video';
 
-          // Extract text for supported file types (before uploading to storage)
+          // Extract text for supported file types
           let extractedText: string | null = null;
           if (fileType === 'docx') {
             try {
@@ -3501,24 +3497,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Upload to object storage instead of storing as base64
-          const { objectStorageService } = await import('./objectStorage');
-          const storageKey = objectStorageService.generateStorageKey(classmateCourseId, filename);
-          const { sizeBytes } = await objectStorageService.uploadBuffer(buffer, storageKey, contentType);
+          // Store file as base64 data URL
+          const base64Data = buffer.toString('base64');
+          const dataUrl = `data:${contentType};base64,${base64Data}`;
 
           // Determine target module: use mapping if provided, otherwise use single module
           const targetModuleId = fileModuleMapping?.[fileId.toString()] || classmateModuleId || null;
 
-          // Create course material with object storage reference
+          // Create course material
           const material = await storage.createCourseMaterial({
             courseId: classmateCourseId,
             moduleId: targetModuleId,
             fileName: filename,
             fileType,
-            fileUrl: null, // No base64 data - using object storage
-            storageKey,
-            contentType,
-            sizeBytes,
+            fileUrl: dataUrl,
             extractedText,
           });
 

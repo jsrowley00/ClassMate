@@ -231,6 +231,37 @@ export const aiUsageLogs = pgTable("ai_usage_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Textbooks table - stores uploaded textbooks with auto-detected chapters
+export const textbooks = pgTable("textbooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: varchar("file_type").notNull().default("pdf"),
+  storageKey: text("storage_key"),
+  fileUrl: text("file_url"),
+  contentType: varchar("content_type"),
+  sizeBytes: integer("size_bytes"),
+  totalPages: integer("total_pages"),
+  processingStatus: varchar("processing_status").notNull().default("pending"),
+  processingError: text("processing_error"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+});
+
+// Textbook chapters table - auto-detected chapters from textbooks
+export const textbookChapters = pgTable("textbook_chapters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  textbookId: varchar("textbook_id").notNull().references(() => textbooks.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  chapterNumber: integer("chapter_number").notNull(),
+  startPage: integer("start_page").notNull(),
+  endPage: integer("end_page").notNull(),
+  extractedText: text("extracted_text"),
+  orderIndex: integer("order_index").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations (must be defined after all tables)
 export const usersRelations = relations(users, ({ many }) => ({
   coursesCreated: many(courses),
@@ -251,6 +282,7 @@ export const coursesRelations = relations(courses, ({ one, many }) => ({
   practiceTests: many(practiceTests),
   chatSessions: many(chatSessions),
   flashcardSets: many(flashcardSets),
+  textbooks: many(textbooks),
 }));
 
 export const courseModulesRelations = relations(courseModules, ({ one, many }) => ({
@@ -392,6 +424,21 @@ export const aiUsageLogsRelations = relations(aiUsageLogs, ({ one }) => ({
   user: one(users, {
     fields: [aiUsageLogs.userId],
     references: [users.id],
+  }),
+}));
+
+export const textbooksRelations = relations(textbooks, ({ one, many }) => ({
+  course: one(courses, {
+    fields: [textbooks.courseId],
+    references: [courses.id],
+  }),
+  chapters: many(textbookChapters),
+}));
+
+export const textbookChaptersRelations = relations(textbookChapters, ({ one }) => ({
+  textbook: one(textbooks, {
+    fields: [textbookChapters.textbookId],
+    references: [textbooks.id],
   }),
 }));
 
@@ -560,3 +607,18 @@ export const insertAiUsageLogSchema = createInsertSchema(aiUsageLogs).omit({
 });
 export type InsertAiUsageLog = z.infer<typeof insertAiUsageLogSchema>;
 export type AiUsageLog = typeof aiUsageLogs.$inferSelect;
+
+export const insertTextbookSchema = createInsertSchema(textbooks).omit({
+  id: true,
+  uploadedAt: true,
+  processedAt: true,
+});
+export type InsertTextbook = z.infer<typeof insertTextbookSchema>;
+export type Textbook = typeof textbooks.$inferSelect;
+
+export const insertTextbookChapterSchema = createInsertSchema(textbookChapters).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertTextbookChapter = z.infer<typeof insertTextbookChapterSchema>;
+export type TextbookChapter = typeof textbookChapters.$inferSelect;

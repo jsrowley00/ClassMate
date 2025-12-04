@@ -229,14 +229,29 @@ export function CanvasImportDialog({
     mutationFn: async () => {
       const token = await getToken();
       
-      // Build file to Canvas module mapping from courseData
+      // Collect all file IDs to import:
+      // 1. All files from selected modules (automatically included)
+      // 2. Plus any explicitly selected files (like extra files not in modules)
+      const allFileIds = new Set<number>(selectedFileIds);
       const fileModuleMapping: Record<number, number> = {};
+      
       courseData?.modules.forEach(module => {
-        module.items.forEach(item => {
-          if (item.type === "File" && item.content_id && selectedFileIds.has(item.content_id)) {
-            fileModuleMapping[item.content_id] = module.id;
-          }
-        });
+        // If module is selected, include ALL its files
+        if (selectedModuleIds.has(module.id)) {
+          module.items.forEach(item => {
+            if (item.type === "File" && item.content_id) {
+              allFileIds.add(item.content_id);
+              fileModuleMapping[item.content_id] = module.id;
+            }
+          });
+        } else {
+          // For non-selected modules, only include explicitly selected files
+          module.items.forEach(item => {
+            if (item.type === "File" && item.content_id && selectedFileIds.has(item.content_id)) {
+              fileModuleMapping[item.content_id] = module.id;
+            }
+          });
+        }
       });
       
       const response = await fetch("/api/canvas/import-structure", {
@@ -249,7 +264,7 @@ export function CanvasImportDialog({
           canvasCourseId: selectedCourse?.id,
           classmateCourseId,
           selectedModuleIds: Array.from(selectedModuleIds),
-          selectedFileIds: Array.from(selectedFileIds),
+          selectedFileIds: Array.from(allFileIds),
           fileCanvasModuleMapping: fileModuleMapping,
         }),
       });

@@ -13,6 +13,7 @@ import tmp from "tmp";
 import { writeFile, unlink } from "fs/promises";
 import { sendCourseInvitationEmail } from "./email";
 import { registerAdminRoutes } from "./adminRoutes";
+import { detectChapters, extractTextFromPdfPages, parseManualChapters } from "./textbookParser";
 import type { User } from "@shared/schema";
 
 // Demo account IDs that bypass subscription requirements (for testing purposes)
@@ -2839,6 +2840,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating flashcard set:", error);
       res.status(500).json({ message: "Failed to update flashcard set" });
+    }
+  });
+
+  // Textbook routes
+  // Upload a textbook and detect chapters
+  app.post('/api/courses/:id/textbooks/upload', isAuthenticated, upload.single('file'), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Verify course exists and user is owner
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "Only the course owner can upload textbooks" });
+      }
+
+      // Check if file is PDF
+      if (file.mimetype !== 'application/pdf') {
+        return res.status(400).json({ message: "Only PDF files are supported for textbook uploads" });
+      }
+
+      // Detect chapters in the PDF
+      const chapterResult = await detectChapters(file.buffer);
+
+      // Return detected chapters for preview (don't save yet)
+      res.json({
+        fileName: file.originalname,
+        fileSize: file.size,
+        totalPages: chapterResult.totalPages,
+        detectionMethod: chapterResult.detectionMethod,
+        confidence: chapterResult.confidence,
+        chapters: chapterResult.chapters,
+        tempFileData: file.buffer.toString('base64'),
+      });
+    } catch (error: any) {
+      console.error("Error uploading textbook:", error);
+      res.status(500).json({ message: error.message || "Failed to upload textbook" });
+    }
+  });
+
+  // Confirm textbook upload and save chapters
+  app.post('/api/courses/:id/textbooks/confirm', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const { fileName, tempFileData, chapters, title } = req.body;
+
+      if (!tempFileData || !chapters || !Array.isArray(chapters)) {
+        return res.status(400).json({ message: "Missing required data" });
+      }
+
+      // Verify course exists and user is owner
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "Only the course owner can upload textbooks" });
+      }
+
+      // Decode the PDF buffer
+      const pdfBuffer = Buffer.from(tempFileData, 'base64');
+
+      // Create the textbook record
+      const textbook = await storage.createTextbook({
+        courseId: id,
+        uploaderId: userId,
+        title: title || fileName || 'Untitled Textbook',
+        fileName: fileName,
+        totalPages: chapters.reduce((max: number, ch: any) => Math.max(max, ch.endPage || 0), 0),
+        chapterCount: chapters.length,
+        fileData: tempFileData,
+        processingStatus: 'processing',
+      });
+
+      // Create chapter records and extract text for each
+      const chapterRecords = [];
+      for (let i = 0; i < chapters.length; i++) {
+        const chapter = chapters[i];
+        
+        // Extract text for this chapter's page range
+        let extractedText = '';
+        try {
+          extractedText = await extractTextFromPdfPages(
+            pdfBuffer,
+            chapter.startPage,
+            chapter.endPage || chapter.startPage
+          );
+        } catch (error) {
+          console.error(`Error extracting text for chapter ${i + 1}:`, error);
+        }
+
+        chapterRecords.push({
+          textbookId: textbook.id,
+          title: chapter.title,
+          orderIndex: i,
+          startPage: chapter.startPage,
+          endPage: chapter.endPage || chapter.startPage,
+          extractedText: extractedText.substring(0, 100000),
+        });
+      }
+
+      const savedChapters = await storage.createTextbookChapters(chapterRecords);
+
+      // Update textbook status to completed
+      await storage.updateTextbook(textbook.id, { processingStatus: 'completed' });
+
+      res.status(201).json({
+        textbook,
+        chapters: savedChapters,
+      });
+    } catch (error: any) {
+      console.error("Error confirming textbook:", error);
+      res.status(500).json({ message: error.message || "Failed to save textbook" });
+    }
+  });
+
+  // Get all textbooks for a course
+  app.get('/api/courses/:id/textbooks', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Verify course exists and user has access
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      const isOwner = course.ownerId === userId;
+      const isEnrolled = await storage.isEnrolled(userId, id);
+      if (!isOwner && !isEnrolled) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const textbooks = await storage.getTextbooks(id);
+      res.json(textbooks);
+    } catch (error: any) {
+      console.error("Error getting textbooks:", error);
+      res.status(500).json({ message: error.message || "Failed to get textbooks" });
+    }
+  });
+
+  // Get chapters for a textbook
+  app.get('/api/textbooks/:textbookId/chapters', isAuthenticated, async (req: any, res) => {
+    try {
+      const { textbookId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const textbook = await storage.getTextbook(textbookId);
+      if (!textbook) {
+        return res.status(404).json({ message: "Textbook not found" });
+      }
+
+      // Verify user has access to the course
+      const course = await storage.getCourse(textbook.courseId);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      const isOwner = course.ownerId === userId;
+      const isEnrolled = await storage.isEnrolled(userId, textbook.courseId);
+      if (!isOwner && !isEnrolled) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const chapters = await storage.getTextbookChapters(textbookId);
+      res.json(chapters);
+    } catch (error: any) {
+      console.error("Error getting textbook chapters:", error);
+      res.status(500).json({ message: error.message || "Failed to get chapters" });
+    }
+  });
+
+  // Delete a textbook
+  app.delete('/api/textbooks/:textbookId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { textbookId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const textbook = await storage.getTextbook(textbookId);
+      if (!textbook) {
+        return res.status(404).json({ message: "Textbook not found" });
+      }
+
+      // Verify user is the uploader
+      if (textbook.uploaderId !== userId) {
+        return res.status(403).json({ message: "Only the uploader can delete this textbook" });
+      }
+
+      // Delete all chapters first, then the textbook
+      const chapters = await storage.getTextbookChapters(textbookId);
+      for (const chapter of chapters) {
+        await storage.deleteTextbookChapter(chapter.id);
+      }
+      await storage.deleteTextbook(textbookId);
+
+      res.json({ message: "Textbook deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting textbook:", error);
+      res.status(500).json({ message: error.message || "Failed to delete textbook" });
     }
   });
 

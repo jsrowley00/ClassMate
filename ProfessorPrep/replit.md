@@ -55,6 +55,8 @@ The design emphasizes a clean, educational interface with a professional blue pr
   - Step-by-step instructions guide professors to create a Canvas access token from their Canvas settings
   - Browse Canvas courses where they are a teacher
   - View course files organized by Canvas modules
+  - **Module structure import**: Option to recreate Canvas module structure in ClassMate - creates matching ClassMate modules before file import
+  - Files are automatically placed in their corresponding ClassMate modules when structure is imported
   - Select multiple files to import at once
   - Imported files are automatically processed (text extraction for DOCX/PPTX) and added to ClassMate modules
   - Supports PDF, Word docs, PowerPoint, images, and videos

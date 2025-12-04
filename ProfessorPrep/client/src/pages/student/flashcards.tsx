@@ -9,9 +9,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Plus, BookOpen, Trash2, Pencil, GraduationCap, RotateCw, X, FolderPlus, ChevronDown, Target } from "lucide-react";
+import { Loader2, Plus, BookOpen, Trash2, Pencil, GraduationCap, RotateCw, X, FolderPlus, ChevronDown, Target, BookText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+
+type TextbookChapter = {
+  id: string;
+  title: string;
+  chapterNumber: number;
+  startPage: number | null;
+  endPage: number | null;
+};
+
+type TextbookWithChapters = {
+  id: string;
+  courseId: string;
+  title: string;
+  chapters: TextbookChapter[];
+};
 
 type FlashcardSet = {
   id: string;
@@ -44,6 +59,7 @@ export default function Flashcards() {
   const [title, setTitle] = useState("");
   const [cardCount, setCardCount] = useState(20);
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [selectAllModules, setSelectAllModules] = useState(true);
   const [isObjectivesExpanded, setIsObjectivesExpanded] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -56,6 +72,10 @@ export default function Flashcards() {
 
   const { data: modules = [], isLoading: modulesLoading } = useQuery<CourseModule[]>({
     queryKey: [`/api/courses/${id}/modules`],
+  });
+
+  const { data: textbooks = [] } = useQuery<TextbookWithChapters[]>({
+    queryKey: [`/api/courses/${id}/textbooks`],
   });
 
   const { data: allLearningObjectives = [] } = useQuery<Array<{
@@ -72,7 +92,7 @@ export default function Flashcards() {
   });
 
   const generateMutation = useMutation({
-    mutationFn: async (data: { title: string; cardCount: number; moduleIds?: string[] }) => {
+    mutationFn: async (data: { title: string; cardCount: number; moduleIds?: string[]; textbookChapterIds?: string[] }) => {
       return await apiRequest("POST", `/api/courses/${id}/flashcards/generate`, data);
     },
     onSuccess: () => {
@@ -81,6 +101,7 @@ export default function Flashcards() {
       setTitle("");
       setCardCount(20);
       setSelectedModules([]);
+      setSelectedChapters([]);
       setSelectAllModules(true);
       toast({
         title: "Flashcards generated!",
@@ -168,7 +189,8 @@ export default function Flashcards() {
     }
 
     const moduleIds = selectAllModules ? undefined : selectedModules;
-    generateMutation.mutate({ title: title.trim(), cardCount, moduleIds });
+    const textbookChapterIds = selectedChapters.length > 0 ? selectedChapters : undefined;
+    generateMutation.mutate({ title: title.trim(), cardCount, moduleIds, textbookChapterIds });
   };
 
   const toggleModule = (moduleId: string) => {
@@ -348,6 +370,69 @@ export default function Flashcards() {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* Textbook Chapters Section */}
+              {textbooks.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Textbook Chapters to Include</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const allChapterIds = textbooks.flatMap(tb => tb.chapters.map(ch => ch.id));
+                        if (selectedChapters.length === allChapterIds.length) {
+                          setSelectedChapters([]);
+                        } else {
+                          setSelectedChapters(allChapterIds);
+                        }
+                      }}
+                      data-testid="button-toggle-chapters"
+                    >
+                      {selectedChapters.length === textbooks.flatMap(tb => tb.chapters).length ? "Deselect All" : "Select All"}
+                    </Button>
+                  </div>
+                  <div className="space-y-3 max-h-48 overflow-y-auto border rounded-md p-3">
+                    {textbooks.map((textbook) => (
+                      <div key={textbook.id} className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <BookText className="h-4 w-4 text-primary" />
+                          <span className="font-medium text-sm">{textbook.title}</span>
+                        </div>
+                        <div className="ml-6 space-y-1 border-l-2 border-border pl-2">
+                          {textbook.chapters.map((chapter) => (
+                            <div key={chapter.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`chapter-${chapter.id}`}
+                                checked={selectedChapters.includes(chapter.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedChapters([...selectedChapters, chapter.id]);
+                                  } else {
+                                    setSelectedChapters(selectedChapters.filter(id => id !== chapter.id));
+                                  }
+                                }}
+                                data-testid={`checkbox-chapter-${chapter.id}`}
+                              />
+                              <Label
+                                htmlFor={`chapter-${chapter.id}`}
+                                className="text-sm font-normal cursor-pointer"
+                              >
+                                {chapter.title}
+                                {chapter.startPage && (
+                                  <span className="text-muted-foreground ml-1">
+                                    (p. {chapter.startPage}{chapter.endPage && chapter.endPage !== chapter.startPage ? `-${chapter.endPage}` : ''})
+                                  </span>
+                                )}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

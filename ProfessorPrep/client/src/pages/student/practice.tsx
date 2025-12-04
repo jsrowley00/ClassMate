@@ -19,10 +19,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Brain, Check, X, FolderOpen, MessageSquare } from "lucide-react";
+import { ArrowLeft, Brain, Check, X, FolderOpen, MessageSquare, BookOpen } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Course, CourseModule } from "@shared/schema";
+
+type TextbookChapter = {
+  id: string;
+  title: string;
+  chapterNumber: number;
+  startPage: number | null;
+  endPage: number | null;
+};
+
+type TextbookWithChapters = {
+  id: string;
+  courseId: string;
+  title: string;
+  chapters: TextbookChapter[];
+};
 
 export default function PracticeTest() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +46,7 @@ export default function PracticeTest() {
   const [testMode, setTestMode] = useState<string>("multiple_choice");
   const [questionCount, setQuestionCount] = useState<string>("10");
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [currentTest, setCurrentTest] = useState<any>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
@@ -59,12 +75,18 @@ export default function PracticeTest() {
     enabled: isAuthenticated && !!id,
   });
 
+  const { data: textbooks = [] } = useQuery<TextbookWithChapters[]>({
+    queryKey: [`/api/courses/${id}/textbooks`],
+    enabled: isAuthenticated && !!id,
+  });
+
   const generateTestMutation = useMutation({
-    mutationFn: async ({ mode, count, moduleIds }: { mode: string; count: number; moduleIds?: string[] }) => {
+    mutationFn: async ({ mode, count, moduleIds, textbookChapterIds }: { mode: string; count: number; moduleIds?: string[]; textbookChapterIds?: string[] }) => {
       return await apiRequest("POST", `/api/courses/${id}/practice/generate`, { 
         testMode: mode,
         questionCount: count,
-        moduleIds: moduleIds && moduleIds.length > 0 ? moduleIds : undefined
+        moduleIds: moduleIds && moduleIds.length > 0 ? moduleIds : undefined,
+        textbookChapterIds: textbookChapterIds && textbookChapterIds.length > 0 ? textbookChapterIds : undefined
       });
     },
     onSuccess: (data: any) => {
@@ -327,11 +349,77 @@ export default function PracticeTest() {
               </div>
             )}
 
+            {textbooks.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base">Select Textbook Chapters to Practice</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const allChapterIds = textbooks.flatMap(tb => tb.chapters.map(ch => ch.id));
+                      if (selectedChapters.length === allChapterIds.length) {
+                        setSelectedChapters([]);
+                      } else {
+                        setSelectedChapters(allChapterIds);
+                      }
+                    }}
+                    data-testid="button-toggle-all-chapters"
+                  >
+                    {selectedChapters.length === textbooks.flatMap(tb => tb.chapters).length ? "Deselect All" : "Select All"}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Select chapters from your uploaded textbooks to include in the practice test.
+                </p>
+                <div className="space-y-3 p-4 rounded-md border">
+                  {textbooks.map((textbook) => (
+                    <div key={textbook.id} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-sm">{textbook.title}</span>
+                      </div>
+                      <div className="ml-6 space-y-1 border-l-2 border-border pl-3">
+                        {textbook.chapters.map((chapter) => (
+                          <div key={chapter.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`chapter-${chapter.id}`}
+                              checked={selectedChapters.includes(chapter.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedChapters([...selectedChapters, chapter.id]);
+                                } else {
+                                  setSelectedChapters(selectedChapters.filter(id => id !== chapter.id));
+                                }
+                              }}
+                              data-testid={`checkbox-chapter-${chapter.id}`}
+                            />
+                            <Label
+                              htmlFor={`chapter-${chapter.id}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {chapter.title}
+                              {chapter.startPage && (
+                                <span className="text-muted-foreground ml-1">
+                                  (p. {chapter.startPage}{chapter.endPage && chapter.endPage !== chapter.startPage ? `-${chapter.endPage}` : ''})
+                                </span>
+                              )}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <Button
               onClick={() => generateTestMutation.mutate({ 
                 mode: testMode, 
                 count: parseInt(questionCount),
-                moduleIds: selectedModules.length > 0 ? selectedModules : undefined
+                moduleIds: selectedModules.length > 0 ? selectedModules : undefined,
+                textbookChapterIds: selectedChapters.length > 0 ? selectedChapters : undefined
               })}
               disabled={generateTestMutation.isPending}
               data-testid="button-generate-test"

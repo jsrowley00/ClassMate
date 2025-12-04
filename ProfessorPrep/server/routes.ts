@@ -2995,7 +2995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all textbooks for a course
+  // Get all textbooks for a course (with chapters included)
   app.get('/api/courses/:id/textbooks', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -3014,7 +3014,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const textbooks = await storage.getTextbooks(id);
-      res.json(textbooks);
+      
+      // Include chapters for each textbook
+      const textbooksWithChapters = await Promise.all(
+        textbooks.map(async (textbook) => {
+          const chapters = await storage.getTextbookChapters(textbook.id);
+          return {
+            ...textbook,
+            chapters: chapters.map(ch => ({
+              id: ch.id,
+              title: ch.title,
+              chapterNumber: ch.chapterNumber,
+              startPage: ch.startPage,
+              endPage: ch.endPage,
+            })),
+          };
+        })
+      );
+      
+      res.json(textbooksWithChapters);
     } catch (error: any) {
       console.error("Error getting textbooks:", error);
       res.status(500).json({ message: error.message || "Failed to get textbooks" });

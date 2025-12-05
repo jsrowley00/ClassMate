@@ -67,6 +67,13 @@ The design emphasizes a clean, educational interface with a professional blue pr
   - Chapters stored separately from regular modules for organized studying
   - Chapter content can be used for AI-powered practice tests and flashcards
   - Database tables: `textbooks` (textbook metadata) and `textbook_chapters` (individual chapters with extracted text)
+- **Study Room Collaboration**: Students can invite collaborators to their self-study rooms:
+  - Invite collaborators by email - they receive an invitation email via Resend
+  - Pending invitations are tracked until accepted
+  - Accepted collaborators gain access to view all materials and flashcards in the study room
+  - Collaborators can create their own flashcards (with owner attribution) but cannot edit/delete others' flashcards
+  - Built-in chat/messaging for study group coordination
+  - Database tables: `studyRoomCollaborators` (invitations and membership) and `studyRoomMessages` (group chat)
 
 ### System Design Choices
 - **Frontend**: React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI for components, and Tailwind CSS for styling.

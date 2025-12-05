@@ -6,10 +6,12 @@ export function useAuth() {
   const { isSignedIn, isLoaded, getToken } = useClerkAuth();
   const { user: clerkUser } = useClerkUser();
 
-  const { data: user, isLoading: userLoading, isError } = useQuery<User>({
+  const { data: user, isLoading: userLoading, isFetched } = useQuery<User>({
     queryKey: ["/api/auth/user"],
-    retry: 2,
+    retry: 3,
+    retryDelay: 1000,
     enabled: isSignedIn === true,
+    staleTime: 30000,
     queryFn: async () => {
       const token = await getToken();
       const response = await fetch("/api/auth/user", {
@@ -24,7 +26,8 @@ export function useAuth() {
     },
   });
 
-  const isLoading = !isLoaded || (isSignedIn && userLoading && !isError);
+  // Loading if Clerk not loaded, or if signed in and query hasn't completed yet
+  const isLoading = !isLoaded || (isSignedIn && !isFetched);
 
   return {
     user,

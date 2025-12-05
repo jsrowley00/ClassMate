@@ -48,6 +48,7 @@ import Flashcards from "@/pages/student/flashcards";
 import FlashcardStudy from "@/pages/student/flashcard-study";
 import StudentProfile from "@/pages/student/profile";
 import BuildStudyRoom from "@/pages/student/build-study-room";
+import Collaborators from "@/pages/student/collaborators";
 import { CourseLayout } from "@/components/course-layout";
 
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -203,6 +204,13 @@ function Router() {
                       {() => (
                         <CourseLayout>
                           <AITutor />
+                        </CourseLayout>
+                      )}
+                    </Route>
+                    <Route path="/student/courses/:id/collaborators">
+                      {() => (
+                        <CourseLayout>
+                          <Collaborators />
                         </CourseLayout>
                       )}
                     </Route>

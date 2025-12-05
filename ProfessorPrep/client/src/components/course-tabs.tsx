@@ -1,6 +1,6 @@
 import { Link, useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, FileText, Brain, MessageSquare, LayoutDashboard, Wrench } from "lucide-react";
+import { BookOpen, FileText, Brain, MessageSquare, LayoutDashboard, Wrench, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Course } from "@shared/schema";
 
@@ -50,6 +50,11 @@ export function CourseTabs({ isCollapsed = false }: CourseTabsProps) {
   const tabs = isSelfStudyRoom
     ? [
         ...baseTabs,
+        {
+          title: "Collaborators",
+          url: `/student/courses/${id}/collaborators`,
+          icon: Users,
+        },
         {
           title: "Build Study Room",
           url: `/student/courses/${id}/build`,

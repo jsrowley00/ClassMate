@@ -16,6 +16,9 @@ import {
   shortAnswerEvaluations,
   textbooks,
   textbookChapters,
+  studyRoomCollaborators,
+  studyRoomInvitations,
+  studyRoomMessages,
   type User,
   type UpsertUser,
   type Course,
@@ -51,6 +54,12 @@ import {
   type InsertTextbook,
   type TextbookChapter,
   type InsertTextbookChapter,
+  type StudyRoomCollaborator,
+  type InsertStudyRoomCollaborator,
+  type StudyRoomInvitation,
+  type InsertStudyRoomInvitation,
+  type StudyRoomMessage,
+  type InsertStudyRoomMessage,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -165,6 +174,28 @@ export interface IStorage {
   createTextbookChapters(chapters: InsertTextbookChapter[]): Promise<TextbookChapter[]>;
   updateTextbookChapter(id: string, data: Partial<TextbookChapter>): Promise<TextbookChapter>;
   deleteTextbookChapter(id: string): Promise<void>;
+
+  // Study room collaborator operations
+  getStudyRoomCollaborators(courseId: string): Promise<Array<StudyRoomCollaborator & { user: User }>>;
+  getStudyRoomCollaborator(courseId: string, userId: string): Promise<StudyRoomCollaborator | undefined>;
+  isStudyRoomCollaborator(courseId: string, userId: string): Promise<boolean>;
+  createStudyRoomCollaborator(collaborator: InsertStudyRoomCollaborator): Promise<StudyRoomCollaborator>;
+  updateStudyRoomCollaboratorStatus(id: string, status: string, joinedAt?: Date): Promise<StudyRoomCollaborator>;
+  removeStudyRoomCollaborator(courseId: string, userId: string): Promise<void>;
+
+  // Study room invitation operations
+  createStudyRoomInvitation(invitation: InsertStudyRoomInvitation): Promise<StudyRoomInvitation>;
+  getStudyRoomInvitation(courseId: string, email: string): Promise<StudyRoomInvitation | undefined>;
+  getStudyRoomInvitationById(id: string): Promise<StudyRoomInvitation | undefined>;
+  getStudyRoomInvitations(courseId: string): Promise<StudyRoomInvitation[]>;
+  getPendingStudyRoomInvitationsForEmail(email: string): Promise<Array<StudyRoomInvitation & { course: Course; inviter: User }>>;
+  updateStudyRoomInvitationStatus(id: string, status: string): Promise<StudyRoomInvitation>;
+  deleteStudyRoomInvitation(id: string): Promise<void>;
+  processStudyRoomInvitations(userId: string, email: string): Promise<void>;
+
+  // Study room message operations
+  getStudyRoomMessages(courseId: string): Promise<Array<StudyRoomMessage & { sender: User }>>;
+  createStudyRoomMessage(message: InsertStudyRoomMessage): Promise<StudyRoomMessage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -718,6 +749,16 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(flashcardSets.createdAt));
   }
 
+  async getCourseFlashcardSetsWithCreators(courseId: string): Promise<Array<FlashcardSet & { creator: User | null }>> {
+    const results = await db
+      .select({ flashcardSet: flashcardSets, creator: users })
+      .from(flashcardSets)
+      .leftJoin(users, eq(flashcardSets.studentId, users.id))
+      .where(eq(flashcardSets.courseId, courseId))
+      .orderBy(desc(flashcardSets.createdAt));
+    return results.map((r) => ({ ...r.flashcardSet, creator: r.creator }));
+  }
+
   async getFlashcardSet(id: string): Promise<FlashcardSet | undefined> {
     const [set] = await db.select().from(flashcardSets).where(eq(flashcardSets.id, id));
     return set;
@@ -1047,6 +1088,165 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTextbookChapter(id: string): Promise<void> {
     await db.delete(textbookChapters).where(eq(textbookChapters.id, id));
+  }
+
+  // Study room collaborator operations
+  async getStudyRoomCollaborators(courseId: string): Promise<Array<StudyRoomCollaborator & { user: User }>> {
+    const results = await db
+      .select({ collaborator: studyRoomCollaborators, user: users })
+      .from(studyRoomCollaborators)
+      .innerJoin(users, eq(studyRoomCollaborators.userId, users.id))
+      .where(eq(studyRoomCollaborators.courseId, courseId));
+    return results.map((r) => ({ ...r.collaborator, user: r.user }));
+  }
+
+  async getStudyRoomCollaborator(courseId: string, userId: string): Promise<StudyRoomCollaborator | undefined> {
+    const [collaborator] = await db
+      .select()
+      .from(studyRoomCollaborators)
+      .where(
+        and(
+          eq(studyRoomCollaborators.courseId, courseId),
+          eq(studyRoomCollaborators.userId, userId)
+        )
+      );
+    return collaborator;
+  }
+
+  async isStudyRoomCollaborator(courseId: string, userId: string): Promise<boolean> {
+    const collaborator = await this.getStudyRoomCollaborator(courseId, userId);
+    return !!collaborator && collaborator.status === "accepted";
+  }
+
+  async createStudyRoomCollaborator(collaborator: InsertStudyRoomCollaborator): Promise<StudyRoomCollaborator> {
+    const [result] = await db.insert(studyRoomCollaborators).values(collaborator).returning();
+    return result;
+  }
+
+  async updateStudyRoomCollaboratorStatus(id: string, status: string, joinedAt?: Date): Promise<StudyRoomCollaborator> {
+    const updateData: Partial<StudyRoomCollaborator> = { status };
+    if (joinedAt) {
+      updateData.joinedAt = joinedAt;
+    }
+    const [result] = await db
+      .update(studyRoomCollaborators)
+      .set(updateData)
+      .where(eq(studyRoomCollaborators.id, id))
+      .returning();
+    return result;
+  }
+
+  async removeStudyRoomCollaborator(courseId: string, userId: string): Promise<void> {
+    await db
+      .delete(studyRoomCollaborators)
+      .where(
+        and(
+          eq(studyRoomCollaborators.courseId, courseId),
+          eq(studyRoomCollaborators.userId, userId)
+        )
+      );
+  }
+
+  // Study room invitation operations
+  async createStudyRoomInvitation(invitation: InsertStudyRoomInvitation): Promise<StudyRoomInvitation> {
+    const [result] = await db.insert(studyRoomInvitations).values({
+      ...invitation,
+      email: invitation.email.toLowerCase(),
+    }).returning();
+    return result;
+  }
+
+  async getStudyRoomInvitation(courseId: string, email: string): Promise<StudyRoomInvitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(studyRoomInvitations)
+      .where(
+        and(
+          eq(studyRoomInvitations.courseId, courseId),
+          eq(studyRoomInvitations.email, email.toLowerCase())
+        )
+      );
+    return invitation;
+  }
+
+  async getStudyRoomInvitationById(id: string): Promise<StudyRoomInvitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(studyRoomInvitations)
+      .where(eq(studyRoomInvitations.id, id));
+    return invitation;
+  }
+
+  async getStudyRoomInvitations(courseId: string): Promise<StudyRoomInvitation[]> {
+    return await db
+      .select()
+      .from(studyRoomInvitations)
+      .where(eq(studyRoomInvitations.courseId, courseId));
+  }
+
+  async getPendingStudyRoomInvitationsForEmail(email: string): Promise<Array<StudyRoomInvitation & { course: Course; inviter: User }>> {
+    const results = await db
+      .select({ invitation: studyRoomInvitations, course: courses, inviter: users })
+      .from(studyRoomInvitations)
+      .innerJoin(courses, eq(studyRoomInvitations.courseId, courses.id))
+      .innerJoin(users, eq(studyRoomInvitations.invitedById, users.id))
+      .where(
+        and(
+          eq(studyRoomInvitations.email, email.toLowerCase()),
+          eq(studyRoomInvitations.status, "pending")
+        )
+      );
+    return results.map((r) => ({ ...r.invitation, course: r.course, inviter: r.inviter }));
+  }
+
+  async updateStudyRoomInvitationStatus(id: string, status: string): Promise<StudyRoomInvitation> {
+    const updateData: Partial<StudyRoomInvitation> = { status };
+    if (status === "accepted") {
+      updateData.acceptedAt = new Date();
+    }
+    const [result] = await db
+      .update(studyRoomInvitations)
+      .set(updateData)
+      .where(eq(studyRoomInvitations.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteStudyRoomInvitation(id: string): Promise<void> {
+    await db.delete(studyRoomInvitations).where(eq(studyRoomInvitations.id, id));
+  }
+
+  async processStudyRoomInvitations(userId: string, email: string): Promise<void> {
+    const pendingInvitations = await this.getPendingStudyRoomInvitationsForEmail(email);
+    
+    for (const invitation of pendingInvitations) {
+      const existingCollaborator = await this.getStudyRoomCollaborator(invitation.courseId, userId);
+      
+      if (!existingCollaborator) {
+        await this.createStudyRoomCollaborator({
+          courseId: invitation.courseId,
+          userId: userId,
+          invitedById: invitation.invitedById,
+          status: "pending",
+        });
+      }
+    }
+  }
+
+  // Study room message operations
+  async getStudyRoomMessages(courseId: string): Promise<Array<StudyRoomMessage & { sender: User }>> {
+    const results = await db
+      .select({ message: studyRoomMessages, sender: users })
+      .from(studyRoomMessages)
+      .innerJoin(users, eq(studyRoomMessages.senderId, users.id))
+      .where(eq(studyRoomMessages.courseId, courseId))
+      .orderBy(desc(studyRoomMessages.createdAt));
+    return results.map((r) => ({ ...r.message, sender: r.sender }));
+  }
+
+  async createStudyRoomMessage(message: InsertStudyRoomMessage): Promise<StudyRoomMessage> {
+    const [result] = await db.insert(studyRoomMessages).values(message).returning();
+    return result;
   }
 }
 

@@ -5,7 +5,7 @@ import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./clerkAuth";
 import { generatePracticeTest, generateTutorResponse, categorizeQuestionsIntoTopics, evaluateShortAnswer, generateGlobalTutorResponse } from "./openai";
-import { insertCourseSchema, updateCourseSchema, insertCourseModuleSchema, insertCourseEnrollmentSchema, generateFlashcardsRequestSchema } from "@shared/schema";
+import { insertCourseSchema, updateCourseSchema, insertCourseModuleSchema, insertCourseEnrollmentSchema, generateFlashcardsRequestSchema, studyRoomCollaborators, flashcardSets } from "@shared/schema";
 import { practiceTestLimiter, chatLimiter, flashcardLimiter, objectivesLimiter } from "./rateLimiting";
 import mammoth from "mammoth";
 import officeParser from "officeparser";
@@ -15,6 +15,8 @@ import { sendCourseInvitationEmail } from "./email";
 import { registerAdminRoutes } from "./adminRoutes";
 import { detectChapters, extractTextFromPdfPages, parseManualChapters } from "./textbookParser";
 import type { User } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 // Demo account IDs that bypass subscription requirements (for testing purposes)
 const DEMO_ACCOUNT_IDS = ["49754447"]; // Jackson Rowley
@@ -897,6 +899,396 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating self-study room:", error);
       res.status(500).json({ message: "Failed to create self-study room" });
+    }
+  });
+
+  // Study Room Collaboration Routes
+  
+  // Get collaborators for a study room
+  app.get('/api/study-rooms/:id/collaborators', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Study room not found" });
+      }
+      
+      if (course.courseType !== "self-study") {
+        return res.status(400).json({ message: "This is not a self-study room" });
+      }
+      
+      // Only owner or accepted collaborators can view collaborators
+      const isOwner = course.ownerId === userId;
+      const isCollaborator = await storage.isStudyRoomCollaborator(id, userId);
+      
+      if (!isOwner && !isCollaborator) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const collaborators = await storage.getStudyRoomCollaborators(id);
+      const invitations = await storage.getStudyRoomInvitations(id);
+      const pendingInvitations = invitations.filter(inv => inv.status === "pending");
+      
+      // Get the owner's info
+      const owner = await storage.getUser(course.ownerId);
+      
+      res.json({ 
+        owner: owner ? { id: owner.id, firstName: owner.firstName, lastName: owner.lastName, email: owner.email } : null,
+        collaborators, 
+        pendingInvitations 
+      });
+    } catch (error) {
+      console.error("Error fetching collaborators:", error);
+      res.status(500).json({ message: "Failed to fetch collaborators" });
+    }
+  });
+
+  // Invite collaborator to study room
+  app.post('/api/study-rooms/:id/collaborators', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { email } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Study room not found" });
+      }
+      
+      if (course.courseType !== "self-study") {
+        return res.status(400).json({ message: "This is not a self-study room" });
+      }
+      
+      // Only owner can invite collaborators
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "Only the room owner can invite collaborators" });
+      }
+      
+      // Check if already invited
+      const existingInvitation = await storage.getStudyRoomInvitation(id, email);
+      if (existingInvitation) {
+        return res.status(400).json({ message: "This email has already been invited" });
+      }
+      
+      // Check if user already exists and is already a collaborator
+      const existingUser = await storage.getUserByEmail(email.toLowerCase());
+      if (existingUser) {
+        const existingCollaborator = await storage.getStudyRoomCollaborator(id, existingUser.id);
+        if (existingCollaborator) {
+          return res.status(400).json({ message: "This user is already a collaborator" });
+        }
+        
+        // User exists, create a collaborator record directly (pending status)
+        await storage.createStudyRoomCollaborator({
+          courseId: id,
+          userId: existingUser.id,
+          invitedById: userId,
+          status: "pending",
+        });
+      }
+      
+      // Create invitation
+      const invitation = await storage.createStudyRoomInvitation({
+        courseId: id,
+        email: email.toLowerCase(),
+        invitedById: userId,
+        status: "pending",
+      });
+      
+      // Send invitation email
+      const inviter = await storage.getUser(userId);
+      const inviterName = inviter?.firstName && inviter?.lastName 
+        ? `${inviter.firstName} ${inviter.lastName}` 
+        : inviter?.email || "Someone";
+      
+      const baseUrl = process.env.REPL_SLUG 
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : process.env.DOMAIN || 'https://classmate.help';
+      
+      const { sendStudyRoomInvitationEmail } = await import('./email');
+      try {
+        await sendStudyRoomInvitationEmail(email, course.name, inviterName, baseUrl);
+      } catch (emailError) {
+        console.error("Failed to send invitation email:", emailError);
+        // Continue even if email fails - invitation is still created
+      }
+      
+      res.status(201).json(invitation);
+    } catch (error) {
+      console.error("Error inviting collaborator:", error);
+      res.status(500).json({ message: "Failed to invite collaborator" });
+    }
+  });
+
+  // Get pending study room invitations for current user
+  app.get('/api/study-room-invitations', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.email) {
+        return res.json([]);
+      }
+      
+      // Get pending invitations from email-based invitations
+      const emailInvitations = await storage.getPendingStudyRoomInvitationsForEmail(user.email);
+      
+      // Also get pending collaborator records (for existing users who were invited)
+      const allCollaborators = await db
+        .select()
+        .from(studyRoomCollaborators)
+        .where(
+          and(
+            eq(studyRoomCollaborators.userId, userId),
+            eq(studyRoomCollaborators.status, "pending")
+          )
+        );
+      
+      // Fetch course and inviter info for collaborator invitations
+      const collaboratorInvitations = await Promise.all(
+        allCollaborators.map(async (collab) => {
+          const course = await storage.getCourse(collab.courseId);
+          const inviter = await storage.getUser(collab.invitedById);
+          return {
+            id: collab.id,
+            courseId: collab.courseId,
+            course: course,
+            inviter: inviter,
+            createdAt: collab.createdAt,
+            type: 'collaborator' as const,
+          };
+        })
+      );
+      
+      // Combine and format invitations
+      const allInvitations = [
+        ...emailInvitations.map(inv => ({
+          id: inv.id,
+          courseId: inv.courseId,
+          course: inv.course,
+          inviter: inv.inviter,
+          createdAt: inv.invitedAt,
+          type: 'email' as const,
+        })),
+        ...collaboratorInvitations,
+      ];
+      
+      res.json(allInvitations);
+    } catch (error) {
+      console.error("Error fetching study room invitations:", error);
+      res.status(500).json({ message: "Failed to fetch invitations" });
+    }
+  });
+
+  // Accept or decline study room invitation
+  app.post('/api/study-room-invitations/:id/respond', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { action } = req.body; // "accept" or "decline"
+      const userId = req.user.claims.sub;
+      
+      if (!action || !["accept", "decline"].includes(action)) {
+        return res.status(400).json({ message: "Invalid action. Use 'accept' or 'decline'" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user?.email) {
+        return res.status(400).json({ message: "User email not found" });
+      }
+      
+      // Check if this is a collaborator invitation
+      const collaborator = await db
+        .select()
+        .from(studyRoomCollaborators)
+        .where(eq(studyRoomCollaborators.id, id))
+        .then(rows => rows[0]);
+      
+      if (collaborator && collaborator.userId === userId) {
+        // This is a direct collaborator invitation
+        if (action === "accept") {
+          await storage.updateStudyRoomCollaboratorStatus(id, "accepted", new Date());
+          
+          // Also update any matching email invitation
+          const emailInvitation = await storage.getStudyRoomInvitation(collaborator.courseId, user.email);
+          if (emailInvitation) {
+            await storage.updateStudyRoomInvitationStatus(emailInvitation.id, "accepted");
+          }
+          
+          return res.json({ message: "Invitation accepted" });
+        } else {
+          await storage.updateStudyRoomCollaboratorStatus(id, "declined");
+          
+          // Also update any matching email invitation
+          const emailInvitation = await storage.getStudyRoomInvitation(collaborator.courseId, user.email);
+          if (emailInvitation) {
+            await storage.updateStudyRoomInvitationStatus(emailInvitation.id, "declined");
+          }
+          
+          return res.json({ message: "Invitation declined" });
+        }
+      }
+      
+      // Check if this is an email-based invitation
+      const emailInvitation = await storage.getStudyRoomInvitationById(id);
+      if (emailInvitation && emailInvitation.email.toLowerCase() === user.email.toLowerCase()) {
+        if (action === "accept") {
+          // Create collaborator record
+          const existingCollab = await storage.getStudyRoomCollaborator(emailInvitation.courseId, userId);
+          if (!existingCollab) {
+            await storage.createStudyRoomCollaborator({
+              courseId: emailInvitation.courseId,
+              userId: userId,
+              invitedById: emailInvitation.invitedById,
+              status: "accepted",
+            });
+          } else {
+            await storage.updateStudyRoomCollaboratorStatus(existingCollab.id, "accepted", new Date());
+          }
+          
+          await storage.updateStudyRoomInvitationStatus(id, "accepted");
+          return res.json({ message: "Invitation accepted" });
+        } else {
+          await storage.updateStudyRoomInvitationStatus(id, "declined");
+          return res.json({ message: "Invitation declined" });
+        }
+      }
+      
+      return res.status(404).json({ message: "Invitation not found" });
+    } catch (error) {
+      console.error("Error responding to invitation:", error);
+      res.status(500).json({ message: "Failed to respond to invitation" });
+    }
+  });
+
+  // Remove collaborator from study room
+  app.delete('/api/study-rooms/:id/collaborators/:collaboratorId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id, collaboratorId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Study room not found" });
+      }
+      
+      // Only owner can remove collaborators
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "Only the room owner can remove collaborators" });
+      }
+      
+      await storage.removeStudyRoomCollaborator(id, collaboratorId);
+      res.json({ message: "Collaborator removed" });
+    } catch (error) {
+      console.error("Error removing collaborator:", error);
+      res.status(500).json({ message: "Failed to remove collaborator" });
+    }
+  });
+
+  // Cancel pending invitation
+  app.delete('/api/study-rooms/:id/invitations/:invitationId', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id, invitationId } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Study room not found" });
+      }
+      
+      // Only owner can cancel invitations
+      if (course.ownerId !== userId) {
+        return res.status(403).json({ message: "Only the room owner can cancel invitations" });
+      }
+      
+      await storage.deleteStudyRoomInvitation(invitationId);
+      res.json({ message: "Invitation cancelled" });
+    } catch (error) {
+      console.error("Error cancelling invitation:", error);
+      res.status(500).json({ message: "Failed to cancel invitation" });
+    }
+  });
+
+  // Study Room Messages
+  
+  // Get messages for a study room
+  app.get('/api/study-rooms/:id/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Study room not found" });
+      }
+      
+      if (course.courseType !== "self-study") {
+        return res.status(400).json({ message: "This is not a self-study room" });
+      }
+      
+      // Only owner or accepted collaborators can view messages
+      const isOwner = course.ownerId === userId;
+      const isCollaborator = await storage.isStudyRoomCollaborator(id, userId);
+      
+      if (!isOwner && !isCollaborator) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const messages = await storage.getStudyRoomMessages(id);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  // Send message in study room
+  app.post('/api/study-rooms/:id/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { subject, content } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+      
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Study room not found" });
+      }
+      
+      if (course.courseType !== "self-study") {
+        return res.status(400).json({ message: "This is not a self-study room" });
+      }
+      
+      // Only owner or accepted collaborators can send messages
+      const isOwner = course.ownerId === userId;
+      const isCollaborator = await storage.isStudyRoomCollaborator(id, userId);
+      
+      if (!isOwner && !isCollaborator) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const message = await storage.createStudyRoomMessage({
+        courseId: id,
+        senderId: userId,
+        subject: subject?.trim() || null,
+        content: content.trim(),
+      });
+      
+      // Fetch the sender info to return with the message
+      const sender = await storage.getUser(userId);
+      
+      res.status(201).json({ ...message, sender });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(500).json({ message: "Failed to send message" });
     }
   });
 
@@ -2546,10 +2938,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Check if user is owner (professor or self-study room creator) or enrolled student
+      // Check if user is owner, enrolled student, or collaborator (for self-study rooms)
       const isOwner = course.ownerId === userId;
       const isEnrolled = await storage.isEnrolled(userId, id);
-      if (!isOwner && !isEnrolled) {
+      const isCollaborator = course.courseType === "self-study" && await storage.isStudyRoomCollaborator(id, userId);
+      
+      if (!isOwner && !isEnrolled && !isCollaborator) {
         return res.status(403).json({ message: "You must be enrolled in this course or be the owner to generate flashcards" });
       }
 
@@ -2681,15 +3075,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Check if user is owner (professor or self-study room creator) or enrolled student
+      // Check if user is owner, enrolled student, or collaborator (for self-study rooms)
       const isOwner = course.ownerId === userId;
       const isEnrolled = await storage.isEnrolled(userId, id);
-      if (!isOwner && !isEnrolled) {
+      const isCollaborator = course.courseType === "self-study" && await storage.isStudyRoomCollaborator(id, userId);
+      
+      if (!isOwner && !isEnrolled && !isCollaborator) {
         return res.status(403).json({ message: "You must be enrolled in this course or be the owner to view flashcards" });
       }
 
-      const flashcardSets = await storage.getFlashcardSets(userId, id);
-      res.json(flashcardSets);
+      // For self-study rooms, return all flashcard sets with creator info
+      if (course.courseType === "self-study" && (isOwner || isCollaborator)) {
+        const flashcardSetsWithCreators = await storage.getCourseFlashcardSetsWithCreators(id);
+        res.json(flashcardSetsWithCreators);
+      } else {
+        // For regular courses, return only the user's flashcard sets
+        const flashcardSets = await storage.getFlashcardSets(userId, id);
+        res.json(flashcardSets);
+      }
     } catch (error) {
       console.error("Error fetching flashcard sets:", error);
       res.status(500).json({ message: "Failed to fetch flashcard sets" });
@@ -2707,13 +3110,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Flashcard set not found" });
       }
 
-      // Verify the set belongs to the user
-      if (flashcardSet.studentId !== userId) {
+      // Get the course to check access
+      const course = await storage.getCourse(flashcardSet.courseId);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      // Check access: owner of set, room owner, or collaborator
+      const isSetOwner = flashcardSet.studentId === userId;
+      const isRoomOwner = course.ownerId === userId;
+      const isCollaborator = course.courseType === "self-study" && await storage.isStudyRoomCollaborator(flashcardSet.courseId, userId);
+      const isEnrolled = await storage.isEnrolled(userId, flashcardSet.courseId);
+
+      if (!isSetOwner && !isRoomOwner && !isCollaborator && !isEnrolled) {
         return res.status(403).json({ message: "Access denied" });
       }
 
+      // Get creator info for the response
+      const creator = await storage.getUser(flashcardSet.studentId);
       const flashcards = await storage.getFlashcards(setId);
-      res.json({ set: flashcardSet, flashcards });
+      
+      res.json({ 
+        set: flashcardSet, 
+        flashcards,
+        creator: creator ? { 
+          id: creator.id, 
+          firstName: creator.firstName, 
+          lastName: creator.lastName 
+        } : null,
+        canEdit: isSetOwner // Only set owner can edit
+      });
     } catch (error) {
       console.error("Error fetching flashcards:", error);
       res.status(500).json({ message: "Failed to fetch flashcards" });
@@ -2792,7 +3218,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Valid front or back content is required" });
       }
 
-      const existingCards = await storage.getFlashcards(id);
+      // Get the flashcard to find its set
+      const allSets = await db.select().from(flashcardSets);
+      let ownerSet = null;
+      
+      for (const set of allSets) {
+        const cards = await storage.getFlashcards(set.id);
+        if (cards.some(c => c.id === id)) {
+          ownerSet = set;
+          break;
+        }
+      }
+      
+      if (!ownerSet || ownerSet.studentId !== userId) {
+        return res.status(403).json({ message: "You can only edit your own flashcards" });
+      }
       
       const updateData: any = {};
       if (front) updateData.front = front.trim();
@@ -2811,6 +3251,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const userId = req.user.claims.sub;
+
+      // Get the flashcard to find its set and verify ownership
+      const allSets = await db.select().from(flashcardSets);
+      let ownerSet = null;
+      
+      for (const set of allSets) {
+        const cards = await storage.getFlashcards(set.id);
+        if (cards.some(c => c.id === id)) {
+          ownerSet = set;
+          break;
+        }
+      }
+      
+      if (!ownerSet || ownerSet.studentId !== userId) {
+        return res.status(403).json({ message: "You can only delete your own flashcards" });
+      }
 
       await storage.deleteFlashcard(id);
       res.json({ message: "Flashcard deleted successfully" });

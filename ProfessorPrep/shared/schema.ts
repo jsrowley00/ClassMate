@@ -231,6 +231,38 @@ export const aiUsageLogs = pgTable("ai_usage_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Study room collaborators table - tracks collaborators in self-study rooms
+export const studyRoomCollaborators = pgTable("study_room_collaborators", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  invitedById: varchar("invited_by_id").notNull().references(() => users.id),
+  status: varchar("status").notNull().default("pending"), // "pending", "accepted", "declined"
+  joinedAt: timestamp("joined_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Study room invitations table - for inviting collaborators by email
+export const studyRoomInvitations = pgTable("study_room_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  email: varchar("email").notNull(),
+  invitedById: varchar("invited_by_id").notNull().references(() => users.id),
+  status: varchar("status").notNull().default("pending"), // "pending", "accepted", "declined"
+  invitedAt: timestamp("invited_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+});
+
+// Study room messages table - email-like messaging between room members
+export const studyRoomMessages = pgTable("study_room_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  subject: text("subject"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Textbooks table - stores uploaded textbooks with auto-detected chapters
 export const textbooks = pgTable("textbooks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -442,6 +474,43 @@ export const textbookChaptersRelations = relations(textbookChapters, ({ one }) =
   }),
 }));
 
+export const studyRoomCollaboratorsRelations = relations(studyRoomCollaborators, ({ one }) => ({
+  course: one(courses, {
+    fields: [studyRoomCollaborators.courseId],
+    references: [courses.id],
+  }),
+  user: one(users, {
+    fields: [studyRoomCollaborators.userId],
+    references: [users.id],
+  }),
+  invitedBy: one(users, {
+    fields: [studyRoomCollaborators.invitedById],
+    references: [users.id],
+  }),
+}));
+
+export const studyRoomInvitationsRelations = relations(studyRoomInvitations, ({ one }) => ({
+  course: one(courses, {
+    fields: [studyRoomInvitations.courseId],
+    references: [courses.id],
+  }),
+  invitedBy: one(users, {
+    fields: [studyRoomInvitations.invitedById],
+    references: [users.id],
+  }),
+}));
+
+export const studyRoomMessagesRelations = relations(studyRoomMessages, ({ one }) => ({
+  course: one(courses, {
+    fields: [studyRoomMessages.courseId],
+    references: [courses.id],
+  }),
+  sender: one(users, {
+    fields: [studyRoomMessages.senderId],
+    references: [users.id],
+  }),
+}));
+
 // Zod schemas and types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -622,3 +691,26 @@ export const insertTextbookChapterSchema = createInsertSchema(textbookChapters).
 });
 export type InsertTextbookChapter = z.infer<typeof insertTextbookChapterSchema>;
 export type TextbookChapter = typeof textbookChapters.$inferSelect;
+
+export const insertStudyRoomCollaboratorSchema = createInsertSchema(studyRoomCollaborators).omit({
+  id: true,
+  joinedAt: true,
+  createdAt: true,
+});
+export type InsertStudyRoomCollaborator = z.infer<typeof insertStudyRoomCollaboratorSchema>;
+export type StudyRoomCollaborator = typeof studyRoomCollaborators.$inferSelect;
+
+export const insertStudyRoomInvitationSchema = createInsertSchema(studyRoomInvitations).omit({
+  id: true,
+  invitedAt: true,
+  acceptedAt: true,
+});
+export type InsertStudyRoomInvitation = z.infer<typeof insertStudyRoomInvitationSchema>;
+export type StudyRoomInvitation = typeof studyRoomInvitations.$inferSelect;
+
+export const insertStudyRoomMessageSchema = createInsertSchema(studyRoomMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertStudyRoomMessage = z.infer<typeof insertStudyRoomMessageSchema>;
+export type StudyRoomMessage = typeof studyRoomMessages.$inferSelect;

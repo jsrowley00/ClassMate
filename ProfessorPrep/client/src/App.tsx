@@ -76,12 +76,14 @@ function Router() {
   if (!user?.role) {
     return (
       <Switch>
+        <Route path="/" component={Landing} />
+        <Route path="/sign-in" component={SignInPage} />
+        <Route path="/sign-up" component={SignUpPage} />
         <Route path="/checkout/success" component={CheckoutSuccess} />
         <Route path="/checkout/cancel" component={CheckoutCancel} />
+        <Route path="/role-selection" component={RoleSelection} />
         {isAdmin && <Route path="/admin" component={AdminDashboard} />}
-        <Route>
-          <RoleSelection />
-        </Route>
+        <Route component={NotFound} />
       </Switch>
     );
   }

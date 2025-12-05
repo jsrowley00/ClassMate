@@ -76,7 +76,7 @@ export default function RoleSelection() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      window.location.reload();
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {

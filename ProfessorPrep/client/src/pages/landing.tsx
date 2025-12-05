@@ -2,9 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Brain, FileText, GraduationCap, Zap, Users } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SignInButton } from "@clerk/clerk-react";
+import { SignInButton, useUser, UserButton } from "@clerk/clerk-react";
+import { Link } from "wouter";
 
 export default function Landing() {
+  const { isSignedIn } = useUser();
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -16,9 +18,18 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <SignInButton mode="redirect">
-              <Button data-testid="button-login">Sign In</Button>
-            </SignInButton>
+            {isSignedIn ? (
+              <>
+                <Link href="/role-selection">
+                  <Button data-testid="button-get-started">Get Started</Button>
+                </Link>
+                <UserButton afterSignOutUrl="/" />
+              </>
+            ) : (
+              <SignInButton mode="redirect">
+                <Button data-testid="button-login">Sign In</Button>
+              </SignInButton>
+            )}
           </div>
         </div>
       </header>
@@ -37,9 +48,15 @@ export default function Landing() {
               tutoring tailored to your professor's course content.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <SignInButton mode="redirect">
-                <Button size="lg" data-testid="button-get-started">Get Started</Button>
-              </SignInButton>
+              {isSignedIn ? (
+                <Link href="/role-selection">
+                  <Button size="lg" data-testid="button-hero-get-started">Choose Your Role</Button>
+                </Link>
+              ) : (
+                <SignInButton mode="redirect">
+                  <Button size="lg" data-testid="button-get-started">Get Started</Button>
+                </SignInButton>
+              )}
               <Button size="lg" variant="outline" asChild>
                 <a href="#features">Learn More</a>
               </Button>
@@ -196,9 +213,15 @@ export default function Landing() {
           <p className="text-xl mb-8 opacity-90">
             Join thousands of students and professors using AI to achieve academic excellence.
           </p>
-          <SignInButton mode="redirect">
-            <Button size="lg" variant="secondary" data-testid="button-cta-signup">Start Learning Today</Button>
-          </SignInButton>
+          {isSignedIn ? (
+            <Link href="/role-selection">
+              <Button size="lg" variant="secondary" data-testid="button-cta-choose-role">Choose Your Role</Button>
+            </Link>
+          ) : (
+            <SignInButton mode="redirect">
+              <Button size="lg" variant="secondary" data-testid="button-cta-signup">Start Learning Today</Button>
+            </SignInButton>
+          )}
         </div>
       </section>
 

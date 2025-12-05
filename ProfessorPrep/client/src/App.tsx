@@ -70,10 +70,15 @@ function Router() {
     );
   }
 
+  // If authenticated but user data not loaded yet, show loading
+  if (!user) {
+    return null;
+  }
+
   // Admin can access dashboard even without role selected
   const isAdmin = user?.email === 'jsrowley00@gmail.com';
 
-  if (!user?.role) {
+  if (!user.role) {
     return (
       <Switch>
         <Route path="/" component={Landing} />

@@ -6,7 +6,7 @@ export function useAuth() {
   const { isSignedIn, isLoaded, getToken } = useClerkAuth();
   const { user: clerkUser } = useClerkUser();
 
-  const { data: user, isLoading: userLoading, isFetching } = useQuery<User>({
+  const { data: user, isLoading: userLoading, isError } = useQuery<User>({
     queryKey: ["/api/auth/user"],
     retry: 2,
     enabled: isSignedIn === true,
@@ -24,7 +24,7 @@ export function useAuth() {
     },
   });
 
-  const isLoading = !isLoaded || (isSignedIn && (userLoading || isFetching || !user));
+  const isLoading = !isLoaded || (isSignedIn && userLoading && !isError);
 
   return {
     user,

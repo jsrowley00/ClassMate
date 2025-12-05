@@ -55,49 +55,33 @@ import AdminDashboard from "@/pages/admin/dashboard";
 function Router() {
   const { isAuthenticated, isLoading, isProfessor, isStudent, user } = useAuth();
 
-  // Not authenticated - show public pages
+  if (isLoading) {
+    return null;
+  }
+
   if (!isAuthenticated) {
     return (
       <Switch>
         <Route path="/" component={Landing} />
         <Route path="/sign-in" component={SignInPage} />
         <Route path="/sign-up" component={SignUpPage} />
-        <Route path="/checkout/success" component={CheckoutSuccess} />
-        <Route path="/checkout/cancel" component={CheckoutCancel} />
-        <Route component={NotFound} />
-      </Switch>
-    );
-  }
-
-  // Authenticated but still loading user data - show landing page (seamless)
-  if (isLoading || !user) {
-    return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route path="/sign-in" component={SignInPage} />
-        <Route path="/sign-up" component={SignUpPage} />
-        <Route path="/checkout/success" component={CheckoutSuccess} />
-        <Route path="/checkout/cancel" component={CheckoutCancel} />
         <Route component={NotFound} />
       </Switch>
     );
   }
 
   // Admin can access dashboard even without role selected
-  const isAdmin = user.email === 'jsrowley00@gmail.com';
+  const isAdmin = user?.email === 'jsrowley00@gmail.com';
 
-  // User has no role yet - show landing with role selection option
-  if (!user.role) {
+  if (!user?.role) {
     return (
       <Switch>
-        <Route path="/" component={Landing} />
-        <Route path="/sign-in" component={SignInPage} />
-        <Route path="/sign-up" component={SignUpPage} />
         <Route path="/checkout/success" component={CheckoutSuccess} />
         <Route path="/checkout/cancel" component={CheckoutCancel} />
-        <Route path="/role-selection" component={RoleSelection} />
         {isAdmin && <Route path="/admin" component={AdminDashboard} />}
-        <Route component={NotFound} />
+        <Route>
+          <RoleSelection />
+        </Route>
       </Switch>
     );
   }

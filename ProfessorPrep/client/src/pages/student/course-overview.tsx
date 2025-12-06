@@ -1,9 +1,27 @@
 import { useState } from "react";
-import { useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useParams, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { BookOpen, Target, Calendar, ChevronDown, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { BookOpen, Target, Calendar, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -11,7 +29,9 @@ type Course = {
   id: string;
   name: string;
   description: string | null;
-  professorId: string;
+  professorId: string | null;
+  ownerId: string | null;
+  courseType: string | null;
   code: string | null;
 };
 
@@ -99,11 +119,62 @@ function ModuleItem({ module, childModules, objectives }: ModuleItemProps) {
 
 export default function CourseOverview() {
   const { id } = useParams<{ id: string }>();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { user } = useAuth();
   const [isObjectivesExpanded, setIsObjectivesExpanded] = useState(false);
   const [expandedObjectiveModules, setExpandedObjectiveModules] = useState<Set<string>>(new Set());
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   const { data: course, isLoading: courseLoading } = useQuery<Course>({
     queryKey: [`/api/courses/${id}`],
+  });
+
+  const isSelfStudyRoom = course?.courseType === "self-study";
+  const isOwner = course?.ownerId === user?.id;
+
+  const updateRoomMutation = useMutation({
+    mutationFn: async (data: { name: string; description: string }) => {
+      return await apiRequest("PATCH", `/api/courses/${id}`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Study room updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/courses/${id}`] });
+      setEditDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update study room",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteRoomMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("DELETE", `/api/courses/${id}`, undefined);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Study room deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete study room",
+        variant: "destructive",
+      });
+    },
   });
 
   const { data: modules = [], isLoading: modulesLoading } = useQuery<CourseModule[]>({
@@ -212,19 +283,115 @@ export default function CourseOverview() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Course Header */}
-      <div>
-        <h1 className="text-3xl font-bold" data-testid="heading-course-name">
-          {course?.name}
-        </h1>
-        {course?.code && (
-          <p className="text-muted-foreground mt-1" data-testid="text-course-code">
-            {course.code}
-          </p>
-        )}
-        {course?.description && (
-          <p className="mt-4 text-foreground" data-testid="text-course-description">
-            {course.description}
-          </p>
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold" data-testid="heading-course-name">
+            {course?.name}
+          </h1>
+          {course?.code && (
+            <p className="text-muted-foreground mt-1" data-testid="text-course-code">
+              {course.code}
+            </p>
+          )}
+          {course?.description && (
+            <p className="mt-4 text-foreground" data-testid="text-course-description">
+              {course.description}
+            </p>
+          )}
+        </div>
+
+        {isSelfStudyRoom && isOwner && (
+          <div className="flex items-center gap-2">
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditName(course?.name || "");
+                    setEditDescription(course?.description || "");
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Study Room</DialogTitle>
+                  <DialogDescription>
+                    Update the study room name and description
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-name">Name</Label>
+                    <Input
+                      id="edit-name"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Enter study room name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-description">Description</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="Enter study room description"
+                      rows={4}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        updateRoomMutation.mutate({
+                          name: editName,
+                          description: editDescription,
+                        });
+                      }}
+                      disabled={!editName.trim() || updateRoomMutation.isPending}
+                    >
+                      {updateRoomMutation.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the study room "{course?.name}" and all associated materials, modules, and flashcards. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteRoomMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete Study Room
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         )}
       </div>
 

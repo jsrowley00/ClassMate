@@ -1106,20 +1106,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
-      // Combine and format invitations
-      const allInvitations = [
-        ...emailInvitations.map(inv => ({
-          id: inv.id,
-          courseId: inv.courseId,
-          course: inv.course,
-          inviter: inv.inviter,
-          createdAt: inv.invitedAt,
-          type: 'email' as const,
-        })),
-        ...collaboratorInvitations,
-      ];
+      // Combine invitations, but deduplicate by courseId
+      // Prefer collaborator invitations over email invitations (they're more direct)
+      const seenCourseIds = new Set<string>();
+      const deduplicatedInvitations: Array<{
+        id: string;
+        courseId: string;
+        course: any;
+        inviter: any;
+        createdAt: any;
+        type: 'email' | 'collaborator';
+      }> = [];
       
-      res.json(allInvitations);
+      // First add collaborator invitations (preferred)
+      for (const collab of collaboratorInvitations) {
+        if (!seenCourseIds.has(collab.courseId)) {
+          seenCourseIds.add(collab.courseId);
+          deduplicatedInvitations.push(collab);
+        }
+      }
+      
+      // Then add email invitations if not already present
+      for (const inv of emailInvitations) {
+        if (!seenCourseIds.has(inv.courseId)) {
+          seenCourseIds.add(inv.courseId);
+          deduplicatedInvitations.push({
+            id: inv.id,
+            courseId: inv.courseId,
+            course: inv.course,
+            inviter: inv.inviter,
+            createdAt: inv.invitedAt,
+            type: 'email' as const,
+          });
+        }
+      }
+      
+      res.json(deduplicatedInvitations);
     } catch (error) {
       console.error("Error fetching study room invitations:", error);
       res.status(500).json({ message: "Failed to fetch invitations" });

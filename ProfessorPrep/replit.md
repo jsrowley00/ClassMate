@@ -70,6 +70,7 @@ The design emphasizes a clean, educational interface with a professional blue pr
 - **Study Room Collaboration**: Students can invite collaborators to their self-study rooms:
   - Invite collaborators by email - they receive an invitation email via Resend
   - Pending invitations are tracked until accepted
+  - **Invitation notifications**: Recipients see pending invitations on their dashboard under "My Self-Study Rooms" with Accept/Decline buttons
   - Accepted collaborators gain access to view all materials and flashcards in the study room
   - Collaborators can create their own flashcards (with owner attribution) but cannot edit/delete others' flashcards
   - Built-in chat/messaging for study group coordination

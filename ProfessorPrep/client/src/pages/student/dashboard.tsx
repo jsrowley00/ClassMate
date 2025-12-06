@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, ArrowRight, FileText, Brain, Layers, MessageCircle, Plus, Home } from "lucide-react";
+import { BookOpen, ArrowRight, FileText, Brain, Layers, MessageCircle, Plus, Home, Mail, Check, X, Users } from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,16 @@ import {
 } from "@/components/ui/dialog";
 import { OnboardingTutorial } from "@/components/onboarding-tutorial";
 import { apiRequest } from "@/lib/queryClient";
-import type { Course } from "@shared/schema";
+import type { Course, User } from "@shared/schema";
+
+interface StudyRoomInvitation {
+  id: string;
+  courseId: string;
+  course: Course;
+  inviter: User | null;
+  createdAt: string;
+  type: 'email' | 'collaborator';
+}
 
 export default function StudentDashboard() {
   const { toast } = useToast();
@@ -75,6 +84,44 @@ export default function StudentDashboard() {
   const { data: selfStudyRooms, isLoading: roomsLoading } = useQuery<Course[]>({
     queryKey: ["/api/student/self-study-rooms"],
     enabled: isAuthenticated,
+  });
+
+  const { data: pendingInvitations, isLoading: invitationsLoading } = useQuery<StudyRoomInvitation[]>({
+    queryKey: ["/api/study-room-invitations"],
+    enabled: isAuthenticated,
+  });
+
+  const respondToInvitationMutation = useMutation({
+    mutationFn: async ({ invitationId, action }: { invitationId: string; action: 'accept' | 'decline' }) => {
+      const res = await fetch(`/api/study-room-invitations/${invitationId}/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to respond to invitation");
+      }
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/study-room-invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/student/self-study-rooms"] });
+      toast({
+        title: variables.action === 'accept' ? "Invitation accepted!" : "Invitation declined",
+        description: variables.action === 'accept' 
+          ? "You now have access to the study room." 
+          : "The invitation has been declined.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const createRoomMutation = useMutation({
@@ -303,6 +350,67 @@ export default function StudentDashboard() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Pending Study Room Invitations */}
+      {!invitationsLoading && pendingInvitations && pendingInvitations.length > 0 && (
+        <div className="mb-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {pendingInvitations.map((invitation) => {
+              const inviterName = invitation.inviter?.firstName && invitation.inviter?.lastName
+                ? `${invitation.inviter.firstName} ${invitation.inviter.lastName}`
+                : invitation.inviter?.email || "Someone";
+              
+              return (
+                <Card key={invitation.id} className="border-primary/50 bg-primary/5">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Mail className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">Study Room Invitation</span>
+                    </div>
+                    <CardTitle className="text-lg">{invitation.course?.name || "Study Room"}</CardTitle>
+                    <CardDescription>
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        Invited by {inviterName}
+                      </span>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => respondToInvitationMutation.mutate({ 
+                          invitationId: invitation.id, 
+                          action: 'accept' 
+                        })}
+                        disabled={respondToInvitationMutation.isPending}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => respondToInvitationMutation.mutate({ 
+                          invitationId: invitation.id, 
+                          action: 'decline' 
+                        })}
+                        disabled={respondToInvitationMutation.isPending}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Decline
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {roomsLoading ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2].map((i) => (

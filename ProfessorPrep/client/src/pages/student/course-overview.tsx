@@ -21,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { BookOpen, Target, Calendar, ChevronDown, ChevronRight, Pencil, Trash2, LogOut } from "lucide-react";
+import { BookOpen, Target, Calendar, ChevronDown, ChevronRight, Pencil, Trash2, LogOut, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -332,6 +332,19 @@ export default function CourseOverview() {
             <p className="mt-4 text-foreground" data-testid="text-course-description">
               {course.description}
             </p>
+          )}
+          {isSelfStudyRoom && isCollaborator && collaboratorInfo?.owner && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              <span>
+                Owned by{" "}
+                <span className="font-medium text-foreground">
+                  {collaboratorInfo.owner.firstName && collaboratorInfo.owner.lastName
+                    ? `${collaboratorInfo.owner.firstName} ${collaboratorInfo.owner.lastName}`
+                    : collaboratorInfo.owner.email || "Unknown"}
+                </span>
+              </span>
+            </div>
           )}
         </div>
 

@@ -868,8 +868,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/student/self-study-rooms', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const rooms = await storage.getSelfStudyRooms(userId);
-      res.json(rooms);
+      
+      // Get rooms the user owns
+      const ownedRooms = await storage.getSelfStudyRooms(userId);
+      const ownedRoomsWithFlag = ownedRooms.map(room => ({
+        ...room,
+        isOwner: true,
+        isCollaborator: false,
+      }));
+      
+      // Get rooms where the user is an accepted collaborator
+      const collaboratorRecords = await db
+        .select()
+        .from(studyRoomCollaborators)
+        .where(
+          and(
+            eq(studyRoomCollaborators.userId, userId),
+            eq(studyRoomCollaborators.status, "accepted")
+          )
+        );
+      
+      // Fetch the actual room data for collaborator rooms
+      const sharedRooms = await Promise.all(
+        collaboratorRecords.map(async (collab) => {
+          const room = await storage.getCourse(collab.courseId);
+          if (room) {
+            return {
+              ...room,
+              isOwner: false,
+              isCollaborator: true,
+            };
+          }
+          return null;
+        })
+      );
+      
+      // Filter out nulls and combine
+      const allRooms = [
+        ...ownedRoomsWithFlag,
+        ...sharedRooms.filter((room): room is NonNullable<typeof room> => room !== null),
+      ];
+      
+      res.json(allRooms);
     } catch (error) {
       console.error("Error fetching self-study rooms:", error);
       res.status(500).json({ message: "Failed to fetch self-study rooms" });
@@ -1211,6 +1251,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error cancelling invitation:", error);
       res.status(500).json({ message: "Failed to cancel invitation" });
+    }
+  });
+
+  // Leave a study room (for collaborators)
+  app.post('/api/study-rooms/:id/leave', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      const course = await storage.getCourse(id);
+      if (!course) {
+        return res.status(404).json({ message: "Study room not found" });
+      }
+      
+      if (course.courseType !== "self-study") {
+        return res.status(400).json({ message: "This is not a self-study room" });
+      }
+      
+      // Owner cannot leave their own room
+      if (course.ownerId === userId) {
+        return res.status(400).json({ message: "Owners cannot leave their own study room. Delete it instead." });
+      }
+      
+      // Check if user is a collaborator
+      const collaborator = await db
+        .select()
+        .from(studyRoomCollaborators)
+        .where(
+          and(
+            eq(studyRoomCollaborators.courseId, id),
+            eq(studyRoomCollaborators.userId, userId),
+            eq(studyRoomCollaborators.status, "accepted")
+          )
+        )
+        .then(rows => rows[0]);
+      
+      if (!collaborator) {
+        return res.status(403).json({ message: "You are not a collaborator of this study room" });
+      }
+      
+      // Remove the collaborator record
+      await storage.removeStudyRoomCollaborator(id, collaborator.id);
+      
+      res.json({ message: "Successfully left the study room" });
+    } catch (error) {
+      console.error("Error leaving study room:", error);
+      res.status(500).json({ message: "Failed to leave study room" });
     }
   });
 

@@ -21,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { BookOpen, Target, Calendar, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { BookOpen, Target, Calendar, ChevronDown, ChevronRight, Pencil, Trash2, LogOut } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -166,6 +166,7 @@ export default function CourseOverview() {
         description: "Study room deleted successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/courses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/student/self-study-rooms"] });
       setLocation("/");
     },
     onError: (error: Error) => {
@@ -176,6 +177,40 @@ export default function CourseOverview() {
       });
     },
   });
+
+  const leaveRoomMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/study-rooms/${id}/leave`, undefined);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "You have left the study room",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/student/self-study-rooms"] });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to leave study room",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { data: collaboratorInfo } = useQuery<{
+    owner: any;
+    collaborators: any[];
+    pendingInvitations: any[];
+  }>({
+    queryKey: [`/api/study-rooms/${id}/collaborators`],
+    enabled: isSelfStudyRoom && !isOwner,
+  });
+
+  const isCollaborator = isSelfStudyRoom && !isOwner && collaboratorInfo?.collaborators?.some(
+    (c: any) => c.userId === user?.id && c.status === "accepted"
+  );
 
   const { data: modules = [], isLoading: modulesLoading } = useQuery<CourseModule[]>({
     queryKey: [`/api/courses/${id}/modules`],
@@ -387,6 +422,35 @@ export default function CourseOverview() {
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Delete Study Room
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
+
+        {isSelfStudyRoom && isCollaborator && (
+          <div className="flex items-center gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Leave Study Room
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Leave this study room?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You will no longer have access to "{course?.name}" and its materials. You can be invited again by the owner.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => leaveRoomMutation.mutate()}
+                  >
+                    Leave Study Room
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

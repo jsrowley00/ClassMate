@@ -71,8 +71,10 @@ The design emphasizes a clean, educational interface with a professional blue pr
   - Invite collaborators by email - they receive an invitation email via Resend
   - Pending invitations are tracked until accepted
   - **Invitation notifications**: Recipients see pending invitations on their dashboard under "My Self-Study Rooms" with Accept/Decline buttons
+  - **Shared rooms display**: Accepted shared rooms appear alongside owned rooms in "My Self-Study Rooms"
   - Accepted collaborators gain access to view all materials and flashcards in the study room
   - Collaborators can create their own flashcards (with owner attribution) but cannot edit/delete others' flashcards
+  - **Leave Study Room**: Collaborators see a "Leave Study Room" button instead of delete, allowing them to exit shared rooms
   - Built-in chat/messaging for study group coordination
   - Database tables: `studyRoomCollaborators` (invitations and membership) and `studyRoomMessages` (group chat)
 
